@@ -94,6 +94,10 @@ def merge_db():
     # add label to pitt corpus
     pitt_full = pd.merge(pitt_full, adr_full, on="file", how="outer")
     print("merged pitt corpus size: {}".format(pitt_full.shape))
+    # add uid to this dataset
+    pitt_full["pid"] = [item.split("-")[0] for item in pitt_full["file"].values.tolist()]
+    pitt_full["uid"] = pitt_full.groupby(["pid"]).ngroup()
+    pitt_full.sort_values(by=["file"], inplace=True)
     pitt_full.to_csv("../pitt_merged.tsv", sep="\t", index=False)
     
 
