@@ -5,6 +5,7 @@ This script is designed for extracting cookie theft task text from WLS dataset
 
 import os
 import re
+import string
 import pandas as pd
 
 
@@ -105,6 +106,50 @@ def add_meta(tran_df):
     wls_meta.to_csv("../wls_full.tsv", sep="\t", index=False)
 
 
+def extract_ids():
+    """
+    keep uids and file name as a single file
+    """
+    try:
+        wls_full = pd.read_csv("../wls_full.tsv", sep="\t")
+    except FileNotFoundError:
+        wls_tran = parse_dirs("../WLS/")
+        add_meta(wls_tran)
+        wls_full = pd.read_csv("../wls_full.tsv", sep="\t")
+    wls_ids = wls_full[["ids", "uid"]]
+    wls_ids.to_csv("../wls_ids.tsv", sep="\t", index=False)
+
+
+def separate_full_data():
+    """
+    for the full merged dataset, only keep filename, uid and metadata,
+    save it as separated dataset
+    """
+    try:
+        wls_full = pd.read_csv("../wls_full.tsv", sep="\t")
+    except FileNotFoundError:
+        wls_tran = parse_dirs("../WLS/")
+        add_meta(wls_tran)
+        wls_full = pd.read_csv("../wls_full.tsv", sep="\t")
+    # drop transcript column
+    wls_full.drop("text", axis=1, inplace=True)
+    # change column to more appropriate names
+    wls_columns = wls_full.columns.values.tolist()
+    new_columns = []
+    for item in wls_columns:
+        item_piece = re.findall(r"\w+|[^\w\s]", item.lower(), re.UNICODE)
+        item_piece = [v for v in item_piece if v not in string.punctuation]
+        new_columns.append("_".join(item_piece))
+    wls_full.columns = new_columns
+    # remove other unwanted columns
+    wls_full.drop(wls_full.filter(regex="unnamed").columns, axis=1, inplace=True)
+    # fill the NA in the age column
+    wls_full["age_2004"] = wls_full["age_2011"] - 7
+    wls_full.to_csv("../wls_final_meta.tsv", sep="\t", index=False)
+
+
 if __name__ == "__main__":
     wls_tran = parse_dirs("../WLS/")
     add_meta(wls_tran)
+    separate_full_data()
+    extract_ids()

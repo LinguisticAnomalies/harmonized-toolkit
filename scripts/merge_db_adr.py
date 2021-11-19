@@ -28,9 +28,11 @@ def get_db_meta(input_folder):
                         # participant only
                         meta_chunks = line.strip().split("|")
                         if meta_chunks[2] == "PAR":
-                            meta_dict = {"file": file.split(".")[0], "gender": meta_chunks[4],
+                            meta_dict = {"file": file.split(".")[0], 
+                                         "gender": meta_chunks[4],
                                          "age": re.sub('[^0-9]','', meta_chunks[3]),
-                                         "dx": meta_chunks[5], "mmse": re.sub('[^0-9]','', meta_chunks[8])}
+                                         "dx": meta_chunks[5], 
+                                         "mmse": re.sub('[^0-9]','', meta_chunks[8])}
                             meta_df = meta_df.append(meta_dict, ignore_index=True)
                     line = fp.readline()
     return meta_df
@@ -70,16 +72,20 @@ def merge_db():
     # read pre-processed .txt files for DementiaBank dataset
     pitt_clean_control_tran = read_txt_to_df(pitt_clean_control)
     pitt_clean_dementia_tran = read_txt_to_df(pitt_clean_dementia)
-    pitt_full_control = pd.merge(pitt_clean_control_tran, meta_control_df, on="file")
-    pitt_full_dementia = pd.merge(pitt_clean_dementia_tran, meta_dementia_df, on="file")
+    pitt_full_control = pd.merge(
+        pitt_clean_control_tran, meta_control_df, on="file")
+    pitt_full_dementia = pd.merge(
+        pitt_clean_dementia_tran, meta_dementia_df, on="file")
     pitt_full = pitt_full_control.append(pitt_full_dementia, ignore_index=True)
     print("pitt corpus size: {}".format(pitt_full.shape))
     # read ADReSS meta dataframe
-    adr_train = pd.read_csv("../ADReSS-IS2020-data/ids/adress_train_id_maptoDB.csv")
+    adr_train = pd.read_csv(
+        "../ADReSS-IS2020-data/ids/adress_train_id_maptoDB.csv")
     adr_train = adr_train[["file_x", "label"]]
     adr_train["file_x"] = adr_train["file_x"].str.split(".").str[0]
     adr_train.rename(columns={"file_x": "file"}, inplace=True)
-    adr_test = pd.read_csv("../ADReSS-IS2020-data/ids/adress_test_id_maptoDB.csv")
+    adr_test = pd.read_csv(
+        "../ADReSS-IS2020-data/ids/adress_test_id_maptoDB.csv")
     adr_test = adr_test[["file_x", "label"]]
     adr_test["file_x"] = adr_test["file_x"].str.split(".").str[0]
     adr_test.rename(columns={"file_x": "file"}, inplace=True)
@@ -89,8 +95,10 @@ def merge_db():
     # add indicators to pitt corpus
     adr_files = adr_train["file"].values.tolist() + adr_test["file"].values.tolist()
     pitt_full["inADReSS"] = np.where(pitt_full["file"].isin(adr_files), 1, 0)
-    pitt_full["ADReSS_train"] = np.where(pitt_full["file"].isin(adr_train["file"].values.tolist()), 1, 0)
-    pitt_full["ADReSS_test"] = np.where(pitt_full["file"].isin(adr_test["file"].values.tolist()), 1, 0)
+    pitt_full["ADReSS_train"] = np.where(
+        pitt_full["file"].isin(adr_train["file"].values.tolist()), 1, 0)
+    pitt_full["ADReSS_test"] = np.where(
+        pitt_full["file"].isin(adr_test["file"].values.tolist()), 1, 0)
     # add label to pitt corpus
     pitt_full = pd.merge(pitt_full, adr_full, on="file", how="outer")
     print("merged pitt corpus size: {}".format(pitt_full.shape))
@@ -98,8 +106,41 @@ def merge_db():
     pitt_full["pid"] = [item.split("-")[0] for item in pitt_full["file"].values.tolist()]
     pitt_full["uid"] = pitt_full.groupby(["pid"]).ngroup()
     pitt_full.sort_values(by=["file"], inplace=True)
+    # add full meta data 
+    pitt_meta = pd.read_csv("../pitt_meta.tsv", sep="\t", skiprows=2)
+    pitt_full = pd.merge(pitt_full, pitt_meta, left_on="uid", right_on="id", how="outer")
     pitt_full.to_csv("../pitt_merged.tsv", sep="\t", index=False)
-    
+
+
+def extract_ids():
+    """
+    keep uids and file name as a single file
+    """
+    try:
+        pitt_full = pd.read_csv("../pitt_merged.tsv", sep="\t")
+    except FileNotFoundError:
+        merge_db()
+        pitt_full = pd.read_csv("../pitt_merged.tsv", sep="\t")
+    pitt_ids = pitt_full[["file", "uid"]]
+    pitt_ids.to_csv("../pitt_ids.tsv", sep="\t", index=False)
+
+
+def separate_full_data():
+    """
+    for the full merged dataset, only keep filename, uid and metadata,
+    save it as separated dataset
+    """
+    try:
+        pitt_full = pd.read_csv("../pitt_merged.tsv", sep="\t")
+    except FileNotFoundError:
+        merge_db()
+        pitt_full = pd.read_csv("../pitt_merged.tsv", sep="\t")
+    # drop transcript column
+    pitt_full.drop(["text", "pid"], axis=1, inplace=True)
+    pitt_full.to_csv("../pitt_final_meta.tsv", sep="\t", index=False)
+
 
 if __name__ == "__main__":
     merge_db()
+    separate_full_data()
+    extract_ids()
