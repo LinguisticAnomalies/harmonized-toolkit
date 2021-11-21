@@ -19,6 +19,8 @@ Ideally the toolkit should have the following structure
 ```
 - Dementia Bank folder contains .cha files
 - WLS folder contains .cha files
+- meta folder contains metadata for Dementia Bank and WLS
+- test folder contains unittest and intergral test files
 - scripts
 	- generate_text_preprocess.sh
 	- text_preprocess.py
