@@ -44,16 +44,11 @@ We provide the baseline manifest as follows:
 ```
 {
   "pre_process": scripts/generate_text_preprocess.sh,
-	"data_uids": [(001,2), (005,2), (006,4),
-								(010,3), ..., (709, 0)],
-  "postive_uids": [(001,2), (005,2),
-									 (018,0), ..., (705, 0)],
-  "negative_uids": [(006,4), (013, 0),
-									  (015,3), ..., (709,0)],
-  "training_uids": [(001,2), (005,2),
-									  (006,4), ..., (705,0)],
-  "test_uids": [(035,1), (045,0),
-								(049,1),...,(709,0)],
+	"data_uids": [(001,2), (005,2), (006,4), (010,3), ..., (709, 0)],
+  "postive_uids": [(001,2), (005,2), (018,0), ..., (705, 0)],
+  "negative_uids": [(006,4), (013, 0), (015,3), ..., (709,0)],
+  "training_uids": [(001,2), (005,2), (006,4), ..., (705,0)],
+  "test_uids": [(035,1), (045,0), (049,1),...,(709,0)],
   # one-line description of methods
   "method": "fine-tuning BERT base model with 10 epochs and 8 batch size on ADReSS training set, validatinng on ADReSS test set",
   "evaluation":
