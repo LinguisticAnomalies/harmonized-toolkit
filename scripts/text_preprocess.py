@@ -86,15 +86,16 @@ def clean_text(text_chunk, param_dict):
             # capitalize the first character
             if return_bool(param_dict["cap_char"]):
                 line = line.capitalize()
+            # only add non-empty sentences
             # if line is not empty
-            if line.strip():
+            if len(line.strip()) > 0:
                 tran += line.strip()
-            # period at the end of sentence
-            if return_bool(param_dict["eos_period"]):
-                tran += ". "
-            # newline at the end of sentence
-            if return_bool(param_dict["eos_newline"]):
-                tran += "\n"
+                # period at the end of sentence
+                if return_bool(param_dict["eos_period"]):
+                    tran += ". "
+                # newline at the end of sentence
+                if return_bool(param_dict["eos_newline"]):
+                    tran += "\n"
     return tran
 
 
@@ -108,41 +109,27 @@ def parse_dirs():
     task_df = pd.DataFrame(columns=["file", "text"])
     for subdir, _, files in os.walk(param_dict["input_path"]):
         for file in files:
-            with open(os.path.join(subdir, file), mode="r", errors="ignore") as file_content:
-                all_tran = file_content.read()
-                if param_dict["dataset_choice"].lower() == "wls":
-                    try:
-                        text = re.search(r'@Bg:	Activity\n.*?@Eg:	Activity',
-                                        all_tran, re.DOTALL).group()
-                        tran = clean_text(text, param_dict)
-                        tran_row = {"file": "20000" + file.split(".")[0],
+            if file.endswith(".cha"):
+                with open(os.path.join(subdir, file), mode="r", errors="ignore") as file_content:
+                    all_tran = file_content.read()
+                    if param_dict["dataset_choice"].lower() == "wls":
+                        try:
+                            text = re.search(r'@Bg:	Activity\n.*?@Eg:	Activity',
+                                            all_tran, re.DOTALL).group()
+                            tran = clean_text(text, param_dict)
+                            tran_row = {"file": "20000" + file.split(".")[0],
+                                        "text": tran}
+                            task_df = task_df.append(tran_row, ignore_index=True)
+                        except AttributeError:
+                            # if no qualified transcript
+                            pass
+                    elif param_dict["dataset_choice"].lower() == "db":
+                        tran = clean_text(all_tran, param_dict)
+                        tran_row = {"file": file.split(".")[0],
                                     "text": tran}
                         task_df = task_df.append(tran_row, ignore_index=True)
-                    except AttributeError:
-                        # if no qualified transcript
-                        pass
-                elif param_dict["dataset_choice"].lower() == "db":
-                    tran = clean_text(all_tran, param_dict)
-                    tran_row = {"file": file.split(".")[0],
-                                "text": tran}
-                    task_df = task_df.append(tran_row, ignore_index=True)
-                else:
-                    raise ValueError("Dataset is not supported, please double check...")
-    # merge to get uids
-    if param_dict["dataset_choice"].lower() == "wls":
-        if return_bool(param_dict["meta"]):
-            wls_meta = pd.read_csv("../wls_final_meta.tsv", sep="\t")
-            task_df = pd.merge(wls_meta, task_df, left_on="ids", right_on="file")
-        else:
-            wls_ids = pd.read_csv("../wls_ids.tsv", sep="\t")
-            task_df = pd.merge(wls_ids, task_df, left_on="ids", right_on="file")
-    elif param_dict["dataset_choice"].lower() == "db":
-        if return_bool(param_dict["meta"]):
-            pitt_meta = pd.read_csv("../pitt_final_meta.tsv", sep="\t")
-            task_df = pd.merge(pitt_meta, task_df, left_on="file", right_on="file")
-        else:
-            pitt_ids = pd.read_csv("../db_ids.tsv", sep="\t")
-            task_df = pd.merge(pitt_ids, task_df, left_on="file", right_on="file")
+                    else:
+                        raise ValueError("Dataset is not supported, please double check...")
     task_df.to_csv(param_dict["out_path"], sep="\t", index=False)
 
 
