@@ -16,8 +16,7 @@ read -p "Remove multiple spaces with a single space? (Y/N): " single_space
 read -p "Capitalize the first character? (Y/N): " cap_char
 read -p "Add period at the end of every sentence? (Y/N): " eos_period
 read -p "Add newline at the end of every sentence? (Y/N): " eos_newline
-read -p "Add meta data for the corresponding dataset? (Y/N): " meta
-read -p "Please enter the output path for your pre-processed transcripts: " out_path
+read -p "Please enter the output path and file name for your pre-processed transcripts: " out_path
 echo "Please stand by, your pre-processing script will be generated shortly...\n"
 echo '{"dataset_choice": "'$dataset_choice'",
        "input_path": "'$input_path'",
@@ -35,7 +34,6 @@ echo '{"dataset_choice": "'$dataset_choice'",
        "cap_char": "'$cap_char'",
        "eos_period": "'$eos_period'",
        "eos_newline": "'$eos_newline'",
-       "meta": "'$meta'",
        "out_path": "'$out_path'" }' > text_process.json
 echo "Your text pre-processing json file has been generated!\n"
 echo "Running text pre-processing script now...\n"
