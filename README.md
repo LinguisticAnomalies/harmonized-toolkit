@@ -27,15 +27,15 @@ Ideally the toolkit should have the following structure:
 
 Both `generate_text_preprocess.sh` and `generate_audio_preprocess.sh` allow to select the data type, pre-processing parameters and input data folder to generate the corresponding cleaned dataset.
 
-### Defining classes and data selection
+## Defining classes and data selection
 
 Participants are required to define their own label to the existing Dementia Bank and WLS dataset. More specifically, participants need to **define** each data samples as one of two categories "positive" vs. "negative" with provided metadata.
 
-### Analysis pipeline
+## Analysis pipeline
 
 Participants are required to design their own analysis pipeline with the given pre-processing pipeline.
 
-### Reporting and Submitting manifest
+## Reporting and Submitting manifest
 
 While we do not ask participants to upload or share their analysis pipeline, participants need to report the details of their pre-processing, data seleciton and analysis pipeline.
 
@@ -62,13 +62,3 @@ We provide the baseline manifest as follows:
 ```
 
 Where the ids of ADReSS set consist of a tuple with two parts: a) participant id, and b) transcript id, which marks the $n$-th visit. Both information can be found in the Pitt's corpus metadata file.
-
-## Contributing
-
-If you find any problems, please feel free to open an issue.
-
-If you can fix an issue you've found, or another issue, please open a pull request with the following steps:
-
-1. For this repository on GitHub to start making your changes
-2. Pass test to show the issue is fixed
-3. Submit the pull request
