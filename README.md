@@ -8,16 +8,15 @@ While the data of Dementia Bank is publicly available, we are not able to redist
 
 It is recommended to use a virtual environment (i.e.,  [venv](https://docs.python.org/3/tutorial/venv.html), [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/), or [conda](https://docs.conda.io/en/latest/)) to use and develop this toolkit. Please install dependency packages using ```pip install -r requirements.txt``` or ```conda install --yes --file requirements.txt``` with python version at least 3.8.
 
+For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/FFmpeg).
+
 ## Usage
 
 ### Pre-processing
 
-Ideally the toolkit should have the following structure:
+This toolkit has the following file structure
 
 ```
-- Dementia Bank folder contains .cha files
-- WLS folder contains .cha files
-- test folder contains unittest and intergral test files
 - scripts
 	- generate_text_preprocess.sh
 	- text_preprocess.py
@@ -26,6 +25,35 @@ Ideally the toolkit should have the following structure:
 ```
 
 Both `generate_text_preprocess.sh` and `generate_audio_preprocess.sh` allow to select the data type, pre-processing parameters and input data folder to generate the corresponding cleaned dataset.
+
+### Supported preprocessing arguments
+
+For more details, please check the corresponding `.sh` file.
+
+#### Audio
+
+- Convert `.mp3` to `.wav`
+- User defined sample rate
+- Feature extraction with Fourier transform
+- Feature extraction Mel-frequency cepstral coefficients
+- No feature extraction - keep the original audio time series array
+- Save the audio time series array to local `.npy` files
+
+To load `.npy` file:
+
+```python
+import numpy as np
+data = np.load("data.npy", allow_pickle=False)
+```
+
+#### Text
+- Remove clear thoat indicator
+- Remove open parenthese or brackets
+- Remove disfluencies, unword, pauses
+- Remove noise indicator
+- Capitalize the first character
+- Add newline at the end of sentence
+- Save the preprocessed text transcirpt as Pandas dataframe
 
 ## Defining classes and data selection
 

@@ -1,37 +1,11 @@
 """
-This script generates pre-processing parameters for WLS or DB with user inputs
+This script generates pre-processing text parameters for WLS or DB with user inputs
 """
 
 import os
 import re
-import json
 import pandas as pd
-
-def read_json():
-    """
-    read the user-generated json file and save it as dict,
-    return the dict
-    """
-    with open("text_process.json", "r") as json_file:
-        prep_param = json.load(json_file)
-    return prep_param
-
-
-def return_bool(value):
-    """
-    given a value, i.e., y or Y, return the boolean value
-
-    :param value: the value from user-generated pre-processing parameters
-    :type value: str
-    :return: the boolean value
-    :rtype: bool
-    """
-    if value.lower() in ("y", "yes"):
-        return True
-    elif value.lower() in ("n", "no"):
-        return False
-    else:
-        raise ValueError("Wrong response, please double check...")
+from util_fun import read_json, return_bool
 
 
 def clean_text(text_chunk, param_dict):
@@ -105,7 +79,7 @@ def parse_dirs():
     pre-processed as users' selections,
     save it to local path
     """
-    param_dict = read_json()
+    param_dict = read_json("text_process.json")
     task_df = pd.DataFrame(columns=["file", "text"])
     for subdir, _, files in os.walk(param_dict["input_path"]):
         for file in files:

@@ -1,2 +1,6 @@
 pandas
 numpy
+librosa
+scipy
+pydub
+sklearn
