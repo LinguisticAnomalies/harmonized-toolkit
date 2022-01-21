@@ -3,9 +3,33 @@ This script generates pre-processing text parameters for WLS or DB with user inp
 """
 
 import os
+import json
 import re
 import pandas as pd
 from util_fun import read_json, return_bool
+
+
+def get_inv_slots(text_chunk):
+    """
+    return all timestamps belongs to INV and 
+
+    :param text_chunk: qualified text chunk from .cha files
+    :type text_chunk: str
+    """
+    all_sents = text_chunk.splitlines()
+    inv_ts = []
+    for line in all_sents:
+        if re.match(r"\*INV", line):
+            pattern = re.findall(r"\d+_\d+", line)
+            if pattern:
+                ts_intervals = pattern[0].split("_")
+                # convert millisecond to second
+                ts_intervals = [int(item)/1000 for item in ts_intervals]
+                # add timestamp to the full list
+                inv_ts.append(ts_intervals)
+        else:
+            pass
+    return inv_ts
 
 
 def clean_text(text_chunk, param_dict):
@@ -94,6 +118,8 @@ def parse_dirs():
                             tran_row = {"file": "20000" + file.split(".")[0],
                                         "text": tran}
                             task_df = task_df.append(tran_row, ignore_index=True)
+                            inv_ts = get_inv_slots(all_tran)
+                            param_dict["20000" + file.split(".")[0]] = inv_ts
                         except AttributeError:
                             # if no qualified transcript
                             pass
@@ -101,10 +127,15 @@ def parse_dirs():
                         tran = clean_text(all_tran, param_dict)
                         tran_row = {"file": file.split(".")[0],
                                     "text": tran}
+                        inv_ts = get_inv_slots(all_tran)
+                        param_dict[file.split(".")[0]] = inv_ts
                         task_df = task_df.append(tran_row, ignore_index=True)
                     else:
                         raise ValueError("Dataset is not supported, please double check...")
     task_df.to_csv(param_dict["out_path"], sep="\t", index=False)
+    # rewrite param_dict with investigator timestep
+    with open("text_process.json", "w") as json_file:
+        json.dump(param_dict, json_file)
 
 
 if __name__ == "__main__":

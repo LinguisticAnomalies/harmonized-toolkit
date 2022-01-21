@@ -34,6 +34,7 @@ For more details, please check the corresponding `.sh` file.
 
 - Convert `.mp3` to `.wav`
 - User defined sample rate
+- Trim out audio samples from investigators (**Note**: this feature only supports Dementia Bank Pitt corpus)
 - Feature extraction with Fourier transform
 - Feature extraction Mel-frequency cepstral coefficients
 - No feature extraction - keep the original audio time series array

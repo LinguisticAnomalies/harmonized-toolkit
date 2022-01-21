@@ -10,13 +10,13 @@ read -p "Remove unitelligible words? (Y/N): " unword
 read -p "Remove pauses eg. (.) or (..)? (Y/N): " pauses
 read -p "Remove forward slashes in square brackets? (Y/N): " slashes
 read -p "Remove noise indicators e.g. &=breath? (Y/N): ": noise_indicators
-read -p "Removesquare brackets indicating an error code? (Y/N): " brackets_error
+read -p "Remove square brackets indicating an error code? (Y/N): " brackets_error
 read -p "Remove all non alpha characters? (Y/N): " non_alpha_char
 read -p "Remove multiple spaces with a single space? (Y/N): " single_space
 read -p "Capitalize the first character? (Y/N): " cap_char
 read -p "Add period at the end of every sentence? (Y/N): " eos_period
 read -p "Add newline at the end of every sentence? (Y/N): " eos_newline
-read -p "Please enter the output path and file name for your pre-processed transcripts: " out_path
+read -p "You data will be stored as .tsv file. Please enter the output path and file name for your pre-processed transcripts: " out_path
 echo "Please stand by, your pre-processing script will be generated shortly...\n"
 echo '{"dataset_choice": "'$dataset_choice'",
        "input_path": "'$input_path'",

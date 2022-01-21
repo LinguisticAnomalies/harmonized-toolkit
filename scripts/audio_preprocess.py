@@ -6,8 +6,10 @@ In general, the pre-rpcessing for audio file has the following steps
     3. feature extraction using FTT or MFCC
 """
 import sys
+import re
 import os
 import librosa
+import sox
 import sklearn
 import numpy as np
 from pydub import AudioSegment
@@ -24,8 +26,8 @@ def convert_to_base_wav(input_path):
     """
     for subdir, _, files in os.walk(input_path):
         for file in files:
-            sys.stdout.write("Currently converting {} to wav file.\n".format(file))
-            if file.endswith(".mp3"):
+            if file.endswith(".mp3") and re.match(r"\d+-\d", file):
+                sys.stdout.write("Currently converting {} to wav file.\n".format(file))
                 out_file = file.split(".")[0] + ".wav"
                 out_file = os.path.join(subdir, out_file)
                 file_content = os.path.join(subdir, file)
@@ -36,9 +38,9 @@ def convert_to_base_wav(input_path):
     sys.stdout.write("Finished!\n")
 
 
-def load_base_wav(input_path_to_file, sample_rate):
+def trim_base_wav(input_path_to_file, sample_rate):
     """
-    load base wav file with customized sample rate
+    load and trim base wav file with customized sample rate
 
     :param input_path_to_file: the local path to a specifc .wav file
     :type input_path: str
@@ -48,10 +50,23 @@ def load_base_wav(input_path_to_file, sample_rate):
     :return: audio time series
     :rtype: np.ndarray
     """
+    try:
+        text_param = read_json("text_process.json")
+    except FileNotFoundError:
+        sys.stdout.write("File not found, please run text preprocessing script first.\n")
     signal = librosa.load(input_path_to_file,
                           sr=sample_rate,
                           duration=librosa.get_duration(input_path_to_file))[0]
-    return signal
+    time_steps = text_param[input_path_to_file.split(".")[0]]
+    # trim process
+    tfm = sox.Transformer()
+    for interval in time_steps:
+        tfm.trim(interval[0], interval[1])
+    tfm.compand()
+    signal_out = tfm.build_array(signal, sample_rate=sample_rate)
+    # save to local file
+    tfm.build_file(signal_out, sample_rate_in=sample_rate,
+                   output_filepath=input_path_to_file)
 
 
 def enable_fft(signal, sample_rate, window_size):
@@ -104,7 +119,7 @@ def parse_dirs():
         for file in files:
             if file.endswith(".wav"):
                 loaded_file = os.path.join(subdir, file)
-                original_signal = load_base_wav(loaded_file, param_dict["sample_rate"])
+                original_signal = trim_base_wav(loaded_file, param_dict["sample_rate"])
                 # feature extraction
                 if param_dict["feature_extract"].lower == "none":
                     out_file = file.split(".")[0] + "_og.npy"
@@ -129,4 +144,6 @@ def parse_dirs():
 
 
 if __name__ == "__main__":
-    parse_dirs()
+    #parse_dirs()
+    input_path = "../audio/pitt/dementia"
+    convert_to_base_wav(input_path)

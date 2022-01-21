@@ -1,6 +1,7 @@
 pandas
-numpy
 librosa
+sox
 scipy
 pydub
 sklearn
+numpy<=1.20
