@@ -4,4 +4,4 @@ sox
 scipy
 pydub
 sklearn
-numpy<=1.20
+numpy

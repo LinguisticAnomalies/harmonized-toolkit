@@ -20,14 +20,14 @@ def convert_to_base_wav(input_path):
     """
     convert .mp3 to .wav,
     the converted files will be saved to the same local path
-    
+
     :param input_path: the local directory containing .mp3 files
     :type input_path: str
     """
     for subdir, _, files in os.walk(input_path):
         for file in files:
             if file.endswith(".mp3") and re.match(r"\d+-\d", file):
-                sys.stdout.write("Currently converting {} to wav file.\n".format(file))
+                sys.stdout.write(f"Currently converting {file} to wav file.\n")
                 out_file = file.split(".")[0] + ".wav"
                 out_file = os.path.join(subdir, out_file)
                 file_content = os.path.join(subdir, file)
@@ -36,6 +36,22 @@ def convert_to_base_wav(input_path):
             else:
                 continue
     sys.stdout.write("Finished!\n")
+
+
+def load_base_wav(input_path_to_file, sample_rate):
+    """
+    load base wav file with customized sample rate
+    :param input_path_to_file: the local path to a specifc .wav file
+    :type input_path: str
+    :param sample_rate: targeting sample rate
+    :type sample_rate: int
+    :return: audio time series
+    :rtype: np.ndarray
+    """
+    signal = librosa.load(input_path_to_file,
+                          sr=sample_rate,
+                          duration=librosa.get_duration(input_path_to_file))[0]
+    return signal
 
 
 def trim_base_wav(input_path_to_file, sample_rate):
@@ -63,27 +79,28 @@ def trim_base_wav(input_path_to_file, sample_rate):
     for interval in time_steps:
         tfm.trim(interval[0], interval[1])
     tfm.compand()
-    signal_out = tfm.build_array(signal, sample_rate=sample_rate)
+    signal_out = tfm.build_array(signal, sample_rate_in=sample_rate)
     # save to local file
     tfm.build_file(signal_out, sample_rate_in=sample_rate,
                    output_filepath=input_path_to_file)
+    return signal_out
 
 
-def enable_fft(signal, sample_rate, window_size):
+def enable_fft(signal, window_size):
     """
     return Fourier transform the input audio signal,
 
     :param signal: the loaded wav audio signal
     :type signal: np.ndarray
-    :param sample_rate: targeting sample rate
-    :type sample_rate: int
     :param window_size: FFT window size
     :type window_size: int
 
     :return: the fft audio array
     :rtype: np.ndarray
     """
-    return librosa.fft_frequencies(signal, sr=sample_rate, n_fft=window_size)
+    fourier = np.fft.fft(signal)
+    freq = np.fft.fftfreq(n=signal.size, d = window_size)
+    return freq
 
 
 def enable_mfcc(signal, sample_rate, n_mfcc, scaled):
@@ -119,7 +136,11 @@ def parse_dirs():
         for file in files:
             if file.endswith(".wav"):
                 loaded_file = os.path.join(subdir, file)
-                original_signal = trim_base_wav(loaded_file, param_dict["sample_rate"])
+                # trim audio for DB
+                if param_dict["dataset_choice"] == "db":
+                    original_signal = trim_base_wav(loaded_file, param_dict["sample_rate"])
+                else:
+                    original_signal = load_base_wav(loaded_file, param_dict["sample_rate"])
                 # feature extraction
                 if param_dict["feature_extract"].lower == "none":
                     out_file = file.split(".")[0] + "_og.npy"
@@ -127,7 +148,6 @@ def parse_dirs():
                         np.save(out_f, original_signal, allow_pickle=False)
                 elif param_dict["feature_extract"].lower == "ftt":
                     ftt_signal = enable_fft(original_signal,
-                                            param_dict["sample_rate"],
                                             int(param_dict["n_feature"]))
                     out_file = file.split(".")[0] + "_ftt.npy"
                     with open(os.path.join(subdir, out_file)) as out_f:
@@ -135,7 +155,8 @@ def parse_dirs():
                 elif param_dict["feature_extract"].lower == "mfcc":
                     mfcc_signal = enable_mfcc(original_signal,
                                               param_dict["sample_rate"],
-                                              int(param_dict["n_feature"]))
+                                              int(param_dict["n_feature"]),
+                                              param_dict["scale"])
                     out_file = file.split(".")[0] + "_mfcc.npy"
                     with open(os.path.join(subdir, out_file)) as out_f:
                         np.save(out_f, mfcc_signal, allow_pickle=False)
@@ -144,6 +165,4 @@ def parse_dirs():
 
 
 if __name__ == "__main__":
-    #parse_dirs()
-    input_path = "../audio/pitt/dementia"
-    convert_to_base_wav(input_path)
+    parse_dirs()
