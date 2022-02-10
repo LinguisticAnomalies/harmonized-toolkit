@@ -102,7 +102,6 @@ def trim_base_wav(input_path_to_file, sample_rate):
     tfm = sox.Transformer()
     signal_out = tfm.build_array(
         input_filepath=input_path_to_file, sample_rate_in=sample_rate)
-    print(signal_out)
     for interval in time_steps:
         tfm.trim(float(interval[0]), float(interval[1]))
     tfm.compand()
