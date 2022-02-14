@@ -1,35 +1,35 @@
 """
 This script generates pre-processing text parameters for WLS or DB with user inputs
 """
-
+import csv
 import os
 import json
 import re
-import pandas as pd
 from util_fun import read_json, return_bool
 
 
 def get_inv_slots(text_chunk):
     """
-    return all timestamps belongs to INV and 
+    return all timestamps belongs to INV and return it as list
 
     :param text_chunk: qualified text chunk from .cha files
     :type text_chunk: str
+    :return: all time steps from participants
     """
     all_sents = text_chunk.splitlines()
-    inv_ts = []
+    par_ts = []
     for line in all_sents:
         if re.match(r"\*INV", line):
-            pattern = re.findall(r"\d+_\d+", line)
+            pattern = re.findall(r"\d+\_\d+", line)
             if pattern:
                 ts_intervals = pattern[0].split("_")
                 # convert millisecond to second
                 ts_intervals = [int(item)/1000 for item in ts_intervals]
                 # add timestamp to the full list
-                inv_ts.append(ts_intervals)
+                par_ts.append(ts_intervals)
         else:
             pass
-    return inv_ts
+    return par_ts
 
 
 def clean_text(text_chunk, param_dict):
@@ -104,35 +104,38 @@ def parse_dirs():
     save it to local path
     """
     param_dict = read_json("text_process.json")
-    task_df = pd.DataFrame(columns=["file", "text"])
-    for subdir, _, files in os.walk(param_dict["input_path"]):
-        for file in files:
-            if file.endswith(".cha"):
-                with open(os.path.join(subdir, file), mode="r", errors="ignore") as file_content:
-                    all_tran = file_content.read()
-                    if param_dict["dataset_choice"].lower() == "wls":
-                        try:
-                            text = re.search(r'@Bg:	Activity\n.*?@Eg:	Activity',
-                                            all_tran, re.DOTALL).group()
-                            tran = clean_text(text, param_dict)
-                            tran_row = {"file": "20000" + file.split(".")[0],
-                                        "text": tran}
-                            task_df = task_df.append(tran_row, ignore_index=True)
+    if os.path.exists(param_dict["out_path"]):
+        os.remove(param_dict["out_path"])
+    with open(param_dict["out_path"], "a") as out_file:
+        tsv_writer = csv.writer(out_file, delimiter="\t")
+        tsv_writer.writerow(["file", "text"])
+        for subdir, _, files in os.walk(param_dict["input_path"]):
+            for file in files:
+                if file.endswith(".cha"):
+                    with open(
+                        os.path.join(subdir, file),
+                        mode="r", errors="ignore") as file_content:
+                        all_tran = file_content.read()
+                        if param_dict["dataset_choice"].lower() == "wls":
+                            try:
+                                text = re.search(
+                                    r'@Bg:	Activity\n.*?@Eg:	Activity',all_tran, re.DOTALL).group()
+                                tran = clean_text(text, param_dict)
+                                file = "20000" + file.split(".")[0]
+                                tsv_writer.writerow([file, tran])
+                                inv_ts = get_inv_slots(all_tran)
+                                param_dict["20000" + file.split(".")[0]] = inv_ts
+                            except AttributeError:
+                                # if no qualified transcript
+                                pass
+                        elif param_dict["dataset_choice"].lower() == "db":
+                            tran = clean_text(all_tran, param_dict)
+                            file = file.split(".")[0]
+                            tsv_writer.writerow([file, tran])
                             inv_ts = get_inv_slots(all_tran)
-                            param_dict["20000" + file.split(".")[0]] = inv_ts
-                        except AttributeError:
-                            # if no qualified transcript
-                            pass
-                    elif param_dict["dataset_choice"].lower() == "db":
-                        tran = clean_text(all_tran, param_dict)
-                        tran_row = {"file": file.split(".")[0],
-                                    "text": tran}
-                        inv_ts = get_inv_slots(all_tran)
-                        param_dict[file.split(".")[0]] = inv_ts
-                        task_df = task_df.append(tran_row, ignore_index=True)
-                    else:
-                        raise ValueError("Dataset is not supported, please double check...")
-    task_df.to_csv(param_dict["out_path"], sep="\t", index=False)
+                            param_dict[file.split(".")[0]] = inv_ts
+                        else:
+                            raise ValueError("Dataset is not supported, please double check...")
     # rewrite param_dict with investigator timestep
     with open("text_process.json", "w") as json_file:
         json.dump(param_dict, json_file)

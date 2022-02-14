@@ -1,4 +1,3 @@
-pandas
 librosa
 sox
 scipy

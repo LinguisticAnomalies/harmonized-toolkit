@@ -2,6 +2,7 @@
 This script contains multiple utility functions that are used in the preprocessing and toolkit
 '''
 import json
+import time
 
 
 def read_json(file_name):
@@ -32,3 +33,13 @@ def return_bool(value):
         return False
     else:
         raise ValueError("Wrong response, please double check...")
+
+
+def convert_time(input_time):
+    """
+    convert time in seconds into hh:mm:ss format
+
+    :param input_time: time in seconds
+    :type input_time: float
+    """
+    return time.strftime('%H:%M:%S', time.gmtime(input_time))

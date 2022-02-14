@@ -8,7 +8,7 @@ While the data of Dementia Bank is publicly available, we are not able to redist
 
 It is recommended to use a virtual environment (i.e.,  [venv](https://docs.python.org/3/tutorial/venv.html), [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/), or [conda](https://docs.conda.io/en/latest/)) to use and develop this toolkit. Please install dependency packages using ```pip install -r requirements.txt``` or ```conda install --yes --file requirements.txt``` with python version at least 3.8.
 
-For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/FFmpeg).
+For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/FFmpeg) and [sox](https://github.com/rabitt/pysox).
 
 ## Usage
 
@@ -48,6 +48,7 @@ data = np.load("data.npy", allow_pickle=False)
 ```
 
 #### Text
+
 - Remove clear thoat indicator
 - Remove open parenthese or brackets
 - Remove disfluencies, unword, pauses
@@ -64,30 +65,33 @@ Participants are required to define their own label to the existing Dementia Ban
 
 Participants are required to design their own analysis pipeline with the given pre-processing pipeline.
 
-## Reporting and Submitting manifest
+## Reporting and Submitting Manifest
 
-While we do not ask participants to upload or share their analysis pipeline, participants need to report the details of their pre-processing, data seleciton and analysis pipeline.
+While we do not ask participants to upload or share their analysis pipeline, participants need to report the details of their pre-processing, data seleciton and analysis pipeline in a **.json** file.
 
 We provide the baseline manifest as follows:
 
-```
+```json
 {
-  "pre_process": scripts/generate_text_preprocess.sh,
-	"data_uids": [(001,2), (005,2), (006,4), (010,3), ..., (709, 0)],
-  "postive_uids": [(001,2), (005,2), (018,0), ..., (705, 0)],
-  "negative_uids": [(006,4), (013, 0), (015,3), ..., (709,0)],
-  "training_uids": [(001,2), (005,2), (006,4), ..., (705,0)],
-  "test_uids": [(035,1), (045,0), (049,1),...,(709,0)],
-  # one-line description of methods
-  "method": "fine-tuning BERT base model with 10 epochs and 8 batch size on ADReSS training set, validatinng on ADReSS test set",
-  "evaluation":
-  	{
-      "ACC@EER": 0.83,
-      "AUC@EER": 0.91,
-      "ACC": 0.77,
-      "AUC": 0.77
-    }
+"pre_process": "scripts/generate_text_preprocess.sh",
+"data_uids": ["001-2", "005-2", "006-4", "010-3"],
+"postive_uids": ["001-2", "005-2", "018-0"],
+"negative_uids": ["006-4", "013-0", "015-3"],
+"training_uids": ["001-2", "005-2", "006-4"],
+"test_uids": ["035-1", "045-0", "049-1:"],
+"method": "fine-tuning BERT base model with 10 epochs and 8 batch size on ADReSS training set, validatinng on ADReSS test set",
+"evaluation":
+{
+    "ACC@EER": 0.83,
+    "AUC@EER": 0.91,
+    "ACC": 0.77,
+    "AUC": 0.77
+}
 }
 ```
 
 Where the ids of ADReSS set consist of a tuple with two parts: a) participant id, and b) transcript id, which marks the $n$-th visit. Both information can be found in the Pitt's corpus metadata file.
+
+## Known Issues
+
+Some .cha files did not align very well, which some audio samples from invetigators did not marked and thus did not get removed by this toolkit.

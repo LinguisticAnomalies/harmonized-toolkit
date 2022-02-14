@@ -3,7 +3,7 @@
 read -p "Which dataset you are pre-processing? wls or db?: "  dataset_choice
 read -p "Where are the .mp3 files located?: " input_path
 read -p "Enter sample rate: " sample_rate
-read -p "Feature extraction methods, selecting from FTT or MFCC or NONE " feature_extract
+read -p "Feature extraction methods, selecting from FTT or MFCC or NONE: " feature_extract
 read -p "Enter number of FTT windows size or MFCC, 0 for NONE: " n_feature
 read -p "Scaling MFCC? y/n: " scale
 echo '{"dataset_choice": "'$dataset_choice'",
