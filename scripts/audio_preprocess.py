@@ -187,7 +187,6 @@ def parse_dirs():
                 loaded_file = os.path.join(subdir, file)
                 if param_dict["dataset_choice"].lower() == "db":
                     trim_base_wav(loaded_file)
-                '''
                 original_signal = load_base_wav(
                         loaded_file, int(param_dict["sample_rate"]))
                 # feature extraction
@@ -210,7 +209,6 @@ def parse_dirs():
                         str(os.path.join(subdir, out_file)), mfcc_signal)
                 else:
                     raise ValueError("wrong feature extraction parameter")
-                '''
 
 
 if __name__ == "__main__":

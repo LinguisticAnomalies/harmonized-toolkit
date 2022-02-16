@@ -8,7 +8,7 @@ While the data of Dementia Bank is publicly available, we are not able to redist
 
 It is recommended to use a virtual environment (i.e.,  [venv](https://docs.python.org/3/tutorial/venv.html), [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/), or [conda](https://docs.conda.io/en/latest/)) to use and develop this toolkit. Please install dependency packages using ```pip install -r requirements.txt``` or ```conda install --yes --file requirements.txt``` with python version at least 3.8.
 
-For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/FFmpeg) and [sox](https://github.com/rabitt/pysox).
+For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/FFmpeg) and [sox](https://github.com/rabitt/pysox) on your local system.
 
 ## Usage
 
@@ -17,6 +17,16 @@ For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/
 This toolkit has the following file structure
 
 ```
+- audio folder
+    - pitt
+        - dementia
+        - control
+    - wls
+- transcript folder
+    - pitt
+        - dementia
+        - control
+    - wls
 - scripts
 	- generate_text_preprocess.sh
 	- text_preprocess.py
@@ -33,7 +43,7 @@ For more details, please check the corresponding `.sh` file.
 #### Audio
 
 - Convert `.mp3` to `.wav`
-- User defined sample rate
+- Resample with user-defined sample rate
 - Trim out audio samples from investigators (**Note**: this feature only supports Dementia Bank Pitt corpus)
 - Feature extraction with Fourier transform
 - Feature extraction Mel-frequency cepstral coefficients
@@ -55,7 +65,7 @@ data = np.load("data.npy", allow_pickle=False)
 - Remove noise indicator
 - Capitalize the first character
 - Add newline at the end of sentence
-- Save the preprocessed text transcirpt as Pandas dataframe
+- Save the pre-processed transcripts as a .tsv file
 
 ## Defining classes and data selection
 
@@ -73,12 +83,12 @@ We provide the baseline manifest as follows:
 
 ```json
 {
-"pre_process": "scripts/generate_text_preprocess.sh",
+"pre_process": "scripts/text_process.json",
 "data_uids": ["001-2", "005-2", "006-4", "010-3"],
 "postive_uids": ["001-2", "005-2", "018-0"],
 "negative_uids": ["006-4", "013-0", "015-3"],
 "training_uids": ["001-2", "005-2", "006-4"],
-"test_uids": ["035-1", "045-0", "049-1:"],
+"test_uids": ["035-1", "045-0", "049-1"],
 "method": "fine-tuning BERT base model with 10 epochs and 8 batch size on ADReSS training set, validatinng on ADReSS test set",
 "evaluation":
 {
@@ -89,8 +99,6 @@ We provide the baseline manifest as follows:
 }
 }
 ```
-
-Where the ids of ADReSS set consist of a tuple with two parts: a) participant id, and b) transcript id, which marks the $n$-th visit. Both information can be found in the Pitt's corpus metadata file.
 
 ## Known Issues
 
