@@ -84,11 +84,16 @@ We provide the baseline manifest as follows:
 ```json
 {
 "pre_process": "scripts/text_process.json",
-"data_uids": ["001-2", "005-2", "006-4", "010-3"],
-"postive_uids": ["001-2", "005-2", "018-0"],
+# all data you use for your method
+"data_uids": ["001-2", "005-2", "006-4", "010-3",...],
+# all postive cases you defined 
+"postive_uids": ["001-2", "005-2", "018-0",...],
+# all negative cases you defined
 "negative_uids": ["006-4", "013-0", "015-3"],
-"training_uids": ["001-2", "005-2", "006-4"],
-"test_uids": ["035-1", "045-0", "049-1"],
+# all cases of your training set
+"training_uids": ["001-2", "005-2", "006-4", ...],
+# all cases of your test set
+"test_uids": ["035-1", "045-0", "049-1", ...],
 "method": "fine-tuning BERT base model with 10 epochs and 8 batch size on ADReSS training set, validatinng on ADReSS test set",
 "evaluation":
 {
