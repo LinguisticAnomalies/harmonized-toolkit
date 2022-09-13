@@ -10,16 +10,16 @@ from util_fun import read_json, return_bool
 
 def get_inv_slots(text_chunk):
     """
-    return all timestamps belongs to INV and return it as list
+    return all timestamps belongs to participant and return it as list
 
     :param text_chunk: qualified text chunk from .cha files
     :type text_chunk: str
     :return: all time steps from participants
     """
-    all_sents = text_chunk.splitlines()
+    all_sents = text_chunk.split("\n")
     par_ts = []
     for line in all_sents:
-        if re.match(r"\*INV", line):
+        if re.match(r"\*PAR", line):
             pattern = re.findall(r"\d+\_\d+", line)
             if pattern:
                 ts_intervals = pattern[0].split("_")
@@ -34,6 +34,7 @@ def get_inv_slots(text_chunk):
 
 def clean_text(text_chunk, param_dict):
     """
+    replace windows line breaker into \n
     clean the text to keep the participant transcript only, based on users' selection
     return the cleaned text
 
@@ -42,7 +43,11 @@ def clean_text(text_chunk, param_dict):
     :return: the cleaned participant transcript
     :rtype: str
     """
-    all_sents = text_chunk.splitlines()
+    text_chunk = text_chunk.replace("\r\n", "")
+    text_chunk = text_chunk.replace("\n", "")
+    # remake the new line
+    text_chunk = re.sub(r"((\*|\%|\@)[A-Za-z]+\:)", r"\n\1", text_chunk)
+    all_sents = text_chunk.split("\n")
     tran = ""
     for line in all_sents:
         if re.match(r"\*PAR:", line):
@@ -119,12 +124,12 @@ def parse_dirs():
                         if param_dict["dataset_choice"].lower() == "wls":
                             try:
                                 text = re.search(
-                                    r'@Bg:	Activity\n.*?@Eg:	Activity',all_tran, re.DOTALL).group()
+                                    r'@Bg:	Activity\n.*?@Eg:	Activity', all_tran, re.DOTALL).group()
                                 tran = clean_text(text, param_dict)
                                 file = "20000" + file.split(".")[0]
                                 tsv_writer.writerow([file, tran])
                                 inv_ts = get_inv_slots(all_tran)
-                                param_dict["20000" + file.split(".")[0]] = inv_ts
+                                param_dict[file.split(".")[0]] = inv_ts
                             except AttributeError:
                                 # if no qualified transcript
                                 pass

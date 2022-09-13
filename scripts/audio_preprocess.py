@@ -6,6 +6,7 @@ In general, the pre-rpcessing for audio file has the following steps
     3. feature extraction using FTT or MFCC
 """
 from datetime import datetime
+from multiprocessing.sharedctypes import Value
 import sys
 import re
 import os
@@ -28,7 +29,7 @@ def convert_to_base_wav(input_path):
     sys.stdout.write("Start to convert .mp3 to .wav\n")
     for subdir, _, files in os.walk(input_path):
         for file in files:
-            if file.endswith(".mp3") and re.match(r"\d+-\d", file):
+            if file.endswith(".mp3"):
                 sys.stdout.write(f"Currently converting and {file} to wav file.\n")
                 out_file = file.split(".")[0] + ".wav"
                 out_file = os.path.join(subdir, out_file)
@@ -48,11 +49,13 @@ def resample_audio(input_path, resample_rate):
     :type input_path: str
     :param resample_rate: the resample rate for .wav files
     :type resample_rate: int
+    :param data_type: whether it's wls or db
+    :type data_type: str
     """
     sys.stdout.write("Start to resample audio to target sample rate...\n")
     for subdir, _, files in os.walk(input_path):
         for file in files:
-            if file.endswith(".wav") and re.match(r"\d{3}-\d{1}.wav", file):
+            if file.endswith(".wav"):
                 sys.stdout.write(f"Resample {file}\n")
                 loaded_file = os.path.join(subdir, file)
                 og_signal, sample_rate = librosa.load(loaded_file)
@@ -78,55 +81,46 @@ def load_base_wav(input_path_to_file, sample_rate):
     return signal
 
 
-def trim_base_wav(input_path_to_file):
+def trim_base_wav(input_path_to_file, out_path, data_type):
     """
     load and trim base wav file with customized sample rate
 
     :param input_path_to_file: the local path to a specifc .wav file
     :type input_path: str
-
-    :return: audio time series
-    :rtype: np.ndarray
+    :param out_path: the local path to store the trimmed audio pieces
+    :type out_path: str
+    :param data_type: the type of the data, i.e., db or wls
+    :type data_type: str
     """
     try:
         text_param = read_json("text_process.json")
     except FileNotFoundError:
         sys.stdout.write("File not found, please run text preprocessing script first.\n")
-    file_name = input_path_to_file.split(".")[2].split("/")[-1]
-    sys.stdout.write(f"Trim {input_path_to_file}\n")
-    time_steps = text_param[file_name]
-    dur = librosa.get_duration(filename=input_path_to_file)
-    # INV has multiple talking
-    if len(time_steps) >= 1:
-        out_files = []
-        # add beginning and end
-        # if INV does not start talking at very beginning
-        if time_steps[0][0] != 0.0:
-            time_steps.insert(0, [0.0, 0.0])
-        time_steps.append([dur, dur])
-        # generate non-INV time steps
-        trim_ts = [[x[1], y[0]] for x, y in zip(time_steps, time_steps[1:])]
-        trim_ts = [item for item in trim_ts if item[0]!=item[1]]
-        trim_ts = [item for item in trim_ts if item[0]<item[1]]
-        for i, interval in enumerate(trim_ts):
-            out_file = ".." + input_path_to_file.split(".")[2] + f"-{i}.wav"
-            out_files.append(out_file)
-            start = interval[0]
-            end = interval[1]
-            # add = to specify milliseconds
-            sox_command = f"sox {input_path_to_file} {out_file} trim {start} ={end}"
-            os.system(sox_command)
-        # concatenate multiple wav files into one
-        os.remove(input_path_to_file)
-        sox_command = "sox "
-        for item in out_files:
-            sox_command += f"{item} "
-        sox_command += f" {input_path_to_file}"
-        os.system(sox_command)
-        for item in out_files:
-            os.remove(item)
-    # No INV taking at all
+    if data_type == "db":
+        file_name = re.findall(r"\d{3}-\d{1}", input_path_to_file)[0]
+    elif data_type == "wls":
+        file_name = re.findall(r"\d{5}", input_path_to_file)[0]
     else:
+        raise ValueError("Cannot find the waveform")
+    meta_file_name = '20000'+str(file_name)
+    try:
+        time_stamps = text_param[meta_file_name]
+        sys.stdout.write(f"Trim {file_name}.wav\n")
+        # # get the timestamps for the specific file
+        # time_stamps = text_param[file_name]
+        # # trim audio from participants with specific intervals
+        if len(time_stamps) > 0:
+            for i, interval in enumerate(time_stamps):
+                out_file = f"{meta_file_name}-{i}.wav"
+                out_file = os.path.join(out_path, out_file)
+                start = interval[0]
+                end = interval[1]
+                sox_command = f"sox {input_path_to_file} {out_file} trim {start} ={end}"
+                os.system(sox_command)
+        else:
+            pass
+    except KeyError:
+        # file does not have qualified intervals
         pass
 
 
@@ -183,32 +177,65 @@ def parse_dirs():
     features = param_dict["feature_extract"]
     for subdir, _, files in os.walk(param_dict["input_path"]):
         for file in files:
-            if file.endswith(".wav") and re.match(r"\d{3}-\d{1}.wav", file):
-                loaded_file = os.path.join(subdir, file)
-                if param_dict["dataset_choice"].lower() == "db":
-                    trim_base_wav(loaded_file)
-                original_signal = load_base_wav(
+            if param_dict["dataset_choice"].lower() == "db":
+                # make sure to load the correct db waveform
+                if file.endswith(".wav") and re.match(r"\d{3}-\d{1}.wav", file):
+                    loaded_file = os.path.join(subdir, file)
+                    trim_base_wav(
+                        loaded_file, param_dict["out_path"],
+                        param_dict["dataset_choice"].lower())
+                    original_signal = load_base_wav(
                         loaded_file, int(param_dict["sample_rate"]))
-                # feature extraction
-                if features.lower() == "none":
-                    out_file = file.split(".")[0] + "-og.npy"
-                    np.save(
-                        str(os.path.join(subdir, out_file)), original_signal)
-                elif features.lower() == "ftt":
-                    ftt_signal = enable_fft(
-                        original_signal, int(param_dict["n_feature"]))
-                    out_file = file.split(".")[0] + "-ftt.npy"
-                    np.save(
-                        str(os.path.join(subdir, out_file)), ftt_signal)
-                elif features.lower() == "mfcc":
-                    mfcc_signal = enable_mfcc(
-                        original_signal, int(param_dict["sample_rate"]),
-                        int(param_dict["n_feature"]), param_dict["scale"])
-                    out_file = file.split(".")[0] + "-mfcc.npy"
-                    np.save(
-                        str(os.path.join(subdir, out_file)), mfcc_signal)
+                    if features.lower() == "none":
+                        out_file = file.split(".")[0] + "-og.npy"
+                        np.save(
+                            str(os.path.join(subdir, out_file)), original_signal)
+                    elif features.lower() == "ftt":
+                        ftt_signal = enable_fft(
+                            original_signal, int(param_dict["n_feature"]))
+                        out_file = file.split(".")[0] + "-ftt.npy"
+                        np.save(
+                            str(os.path.join(subdir, out_file)), ftt_signal)
+                    elif features.lower() == "mfcc":
+                        mfcc_signal = enable_mfcc(
+                            original_signal, int(param_dict["sample_rate"]),
+                            int(param_dict["n_feature"]), param_dict["scale"])
+                        out_file = file.split(".")[0] + "-mfcc.npy"
+                        np.save(
+                            str(os.path.join(subdir, out_file)), mfcc_signal)
+                    else:
+                        raise ValueError("wrong feature extraction parameter")
                 else:
-                    raise ValueError("wrong feature extraction parameter")
+                    continue
+            elif param_dict["dataset_choice"].lower() == "wls":
+                if file.endswith(".wav") and re.match(r"\d{5}.wav", file):
+                    loaded_file = os.path.join(subdir, file)
+                    trim_base_wav(
+                        loaded_file, param_dict["out_path"],
+                        param_dict["dataset_choice"].lower())
+                    original_signal = load_base_wav(
+                        loaded_file, int(param_dict["sample_rate"]))
+                    if features.lower() == "none":
+                        out_file = file.split(".")[0] + "-og.npy"
+                        np.save(
+                            str(os.path.join(subdir, out_file)), original_signal)
+                    elif features.lower() == "ftt":
+                        ftt_signal = enable_fft(
+                            original_signal, int(param_dict["n_feature"]))
+                        out_file = file.split(".")[0] + "-ftt.npy"
+                        np.save(
+                            str(os.path.join(subdir, out_file)), ftt_signal)
+                    elif features.lower() == "mfcc":
+                        mfcc_signal = enable_mfcc(
+                            original_signal, int(param_dict["sample_rate"]),
+                            int(param_dict["n_feature"]), param_dict["scale"])
+                        out_file = file.split(".")[0] + "-mfcc.npy"
+                        np.save(
+                            str(os.path.join(subdir, out_file)), mfcc_signal)
+                    else:
+                        raise ValueError("wrong feature extraction parameter")
+            else:
+                raise ValueError("Wrong dataset")
 
 
 if __name__ == "__main__":
