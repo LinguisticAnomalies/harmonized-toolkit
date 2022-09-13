@@ -1,7 +1,0 @@
-{"dataset_choice": "wls",
-       "sample_rate": "16000",
-       "input_path": "/home/lixx3013/dementia_toolkit/audio/WLS/02/",
-       "out_path": "/home/lixx3013/audio-pieces/wls/02/",
-       "feature_extract": "none",
-       "n_feature": "0",
-       "scale": "n" }
