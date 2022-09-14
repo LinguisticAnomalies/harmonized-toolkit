@@ -81,7 +81,7 @@ def clean_text(text_chunk, param_dict):
                 line = line.capitalize()
             # only add non-empty sentences
             # if line is not empty
-            if len(line.strip()) > 0:
+            if len(line.strip()) > 0 and start != 0.0 and end != 0.0:
                 tran += line.strip()
                 lines.append(line.strip())
                 starts.append(start)
