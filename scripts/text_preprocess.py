@@ -5,31 +5,8 @@ import csv
 import os
 import json
 import re
+import pandas as pd
 from util_fun import read_json, return_bool
-
-
-def get_inv_slots(text_chunk):
-    """
-    return all timestamps belongs to participant and return it as list
-
-    :param text_chunk: qualified text chunk from .cha files
-    :type text_chunk: str
-    :return: all time steps from participants
-    """
-    all_sents = text_chunk.split("\n")
-    par_ts = []
-    for line in all_sents:
-        if re.match(r"\*PAR", line):
-            pattern = re.findall(r"\d+\_\d+", line)
-            if pattern:
-                ts_intervals = pattern[0].split("_")
-                # convert millisecond to second
-                ts_intervals = [int(item)/1000 for item in ts_intervals]
-                # add timestamp to the full list
-                par_ts.append(ts_intervals)
-        else:
-            pass
-    return par_ts
 
 
 def clean_text(text_chunk, param_dict):
@@ -43,15 +20,28 @@ def clean_text(text_chunk, param_dict):
     :return: the cleaned participant transcript
     :rtype: str
     """
-    text_chunk = text_chunk.replace("\r\n", "")
-    text_chunk = text_chunk.replace("\n", "")
+    text_chunk = text_chunk.replace("\r\n", " ")
+    text_chunk = text_chunk.replace("\n", " ")
     # remake the new line
     text_chunk = re.sub(r"((\*|\%|\@)[A-Za-z]+\:)", r"\n\1", text_chunk)
     all_sents = text_chunk.split("\n")
     tran = ""
+    starts = []
+    ends = []
+    lines = []
     for line in all_sents:
         if re.match(r"\*PAR:", line):
             line = re.sub(r"\*PAR:", "", line)
+            pattern = re.findall(r"\d+\_\d+", line)
+            start = 0
+            end = 0
+            if pattern:
+                ts_intervals = pattern[0].split("_")
+                # convert millisecond to second
+                ts_intervals = [int(item)/1000 for item in ts_intervals]
+                start = ts_intervals[0]
+                end = ts_intervals[1]
+            line = line.replace("_", " ")
             # throat clears
             if return_bool(param_dict["clear_thoat"]):
                 line = re.sub(r'\&\=clears\s+throat', r' ', line)
@@ -66,7 +56,7 @@ def clean_text(text_chunk, param_dict):
                 line = re.sub(r'\&\w+\s+', r' ', line)
             # remove unitelligible words
             if return_bool(param_dict["unword"]):
-                line = re.sub(r'xxx', r' ', line)
+                line = re.sub(r'(\w)\1\1', r'', line)
             # remove pauses eg. (.) or (..)
             if return_bool(param_dict["pauses"]):
                 line = re.sub(r'\(\.+\)', r' ', line)
@@ -93,13 +83,16 @@ def clean_text(text_chunk, param_dict):
             # if line is not empty
             if len(line.strip()) > 0:
                 tran += line.strip()
+                lines.append(line.strip())
+                starts.append(start)
+                ends.append(end)
                 # period at the end of sentence
                 if return_bool(param_dict["eos_period"]):
                     tran += ". "
                 # newline at the end of sentence
                 if return_bool(param_dict["eos_newline"]):
                     tran += "\n"
-    return tran
+    return tran, lines, starts, ends
 
 
 def parse_dirs():
@@ -111,6 +104,13 @@ def parse_dirs():
     param_dict = read_json("text_process.json")
     if os.path.exists(param_dict["out_path"]):
         os.remove(param_dict["out_path"])
+    out_cha_path = param_dict["out_path"].replace(".tsv", "_cha.csv")
+    full_lines = []
+    full_indexes = []
+    full_starts = []
+    full_ends = []
+    full_files = []
+    full_cha_df = pd.DataFrame()
     with open(param_dict["out_path"], "a") as out_file:
         tsv_writer = csv.writer(out_file, delimiter="\t")
         tsv_writer.writerow(["file", "text"])
@@ -122,25 +122,43 @@ def parse_dirs():
                         mode="r", errors="ignore") as file_content:
                         all_tran = file_content.read()
                         if param_dict["dataset_choice"].lower() == "wls":
+                            file_name = "20000" + file.split(".")[0]
                             try:
                                 text = re.search(
                                     r'@Bg:	Activity\n.*?@Eg:	Activity', all_tran, re.DOTALL).group()
-                                tran = clean_text(text, param_dict)
-                                file = "20000" + file.split(".")[0]
-                                tsv_writer.writerow([file, tran])
-                                inv_ts = get_inv_slots(all_tran)
-                                param_dict[file.split(".")[0]] = inv_ts
+                                tran, lines, starts, ends = clean_text(text, param_dict)
+                                index = [i for i in range(0, len(starts))]
+                                full_files.extend([file_name]*len(starts))
+                                full_lines.extend(lines)
+                                full_starts.extend(starts)
+                                full_ends.extend(ends)
+                                full_indexes.extend(index)
+                                tsv_writer.writerow([file_name, tran])
+                                inv_ts = [[i, j] for i, j in zip(starts, ends)]
+                                param_dict[file_name] = inv_ts
                             except AttributeError:
                                 # if no qualified transcript
                                 pass
                         elif param_dict["dataset_choice"].lower() == "db":
-                            tran = clean_text(all_tran, param_dict)
-                            file = file.split(".")[0]
-                            tsv_writer.writerow([file, tran])
-                            inv_ts = get_inv_slots(all_tran)
-                            param_dict[file.split(".")[0]] = inv_ts
+                            file_name = file.split(".")[0]
+                            tran, lines, starts, ends = clean_text(all_tran, param_dict)
+                            index = [i for i in range(0, len(starts))]
+                            full_files.extend([file_name]*len(starts))
+                            full_lines.extend(lines)
+                            full_starts.extend(starts)
+                            full_ends.extend(ends)
+                            full_indexes.extend(index)
+                            tsv_writer.writerow([file_name, tran])
+                            inv_ts = [[i, j] for i, j in zip(starts, ends)]
+                            param_dict[file_name] = inv_ts
                         else:
                             raise ValueError("Dataset is not supported, please double check...")
+    full_cha_df["file"] = full_files
+    full_cha_df["index"] = full_indexes
+    full_cha_df["trans"] = full_lines
+    full_cha_df["start"] = full_starts
+    full_cha_df["end"] = full_ends
+    full_cha_df.to_csv(out_cha_path, index=False)
     # rewrite param_dict with investigator timestep
     with open("text_process.json", "w") as json_file:
         json.dump(param_dict, json_file)

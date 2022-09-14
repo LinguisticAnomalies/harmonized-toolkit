@@ -6,7 +6,7 @@ In general, the pre-rpcessing for audio file has the following steps
     3. feature extraction using FTT or MFCC
 """
 from datetime import datetime
-from multiprocessing.sharedctypes import Value
+import glob
 import sys
 import re
 import os
@@ -30,7 +30,7 @@ def convert_to_base_wav(input_path):
     for subdir, _, files in os.walk(input_path):
         for file in files:
             if file.endswith(".mp3"):
-                sys.stdout.write(f"Currently converting and {file} to wav file.\n")
+                sys.stdout.write(f"Currently converting {file} to wav file.\n")
                 out_file = file.split(".")[0] + ".wav"
                 out_file = os.path.join(subdir, out_file)
                 file_content = os.path.join(subdir, file)
@@ -100,18 +100,18 @@ def trim_base_wav(input_path_to_file, out_path, data_type):
         file_name = re.findall(r"\d{3}-\d{1}", input_path_to_file)[0]
     elif data_type == "wls":
         file_name = re.findall(r"\d{5}", input_path_to_file)[0]
+        file_name = '20000'+str(file_name)
     else:
         raise ValueError("Cannot find the waveform")
-    meta_file_name = '20000'+str(file_name)
     try:
-        time_stamps = text_param[meta_file_name]
+        time_stamps = text_param[file_name]
         sys.stdout.write(f"Trim {file_name}.wav\n")
         # # get the timestamps for the specific file
         # time_stamps = text_param[file_name]
         # # trim audio from participants with specific intervals
         if len(time_stamps) > 0:
             for i, interval in enumerate(time_stamps):
-                out_file = f"{meta_file_name}-{i}.wav"
+                out_file = f"{file_name}-{i}.wav"
                 out_file = os.path.join(out_path, out_file)
                 start = interval[0]
                 end = interval[1]
@@ -170,10 +170,13 @@ def parse_dirs():
     """
     param_dict = read_json("audio_process.json")
     param_dict["sample_rate"] = int(param_dict["sample_rate"])
-    # convert .mp3 to .wav
-    convert_to_base_wav(param_dict["input_path"])
-    # resample .wav files
-    resample_audio(param_dict["input_path"], int(param_dict["sample_rate"]))
+    # check if they are already converted and resampled
+    # only for debug
+    if len(glob.glob(param_dict["input_path"]+"*.wav")) == 0:
+        # convert .mp3 to .wav
+        convert_to_base_wav(param_dict["input_path"])
+        # resample .wav files
+        resample_audio(param_dict["input_path"], int(param_dict["sample_rate"]))
     features = param_dict["feature_extract"]
     for subdir, _, files in os.walk(param_dict["input_path"]):
         for file in files:
