@@ -81,17 +81,23 @@ def clean_text(text_chunk, param_dict):
                 line = line.capitalize()
             # only add non-empty sentences
             # if line is not empty
-            if len(line.strip()) > 0 and start != 0.0 and end != 0.0:
+            if not return_bool(param_dict["timestamps_only"]):
+                if len(line.strip()) > 0 and start != 0.0 and end != 0.0:
+                    tran += line.strip()
+                    lines.append(line.strip())
+                    starts.append(start)
+                    ends.append(end)
+            if return_bool(param_dict["timestamps_only"]):
                 tran += line.strip()
                 lines.append(line.strip())
                 starts.append(start)
                 ends.append(end)
-                # period at the end of sentence
-                if return_bool(param_dict["eos_period"]):
-                    tran += ". "
-                # newline at the end of sentence
-                if return_bool(param_dict["eos_newline"]):
-                    tran += "\n"
+            # period at the end of sentence
+            if return_bool(param_dict["eos_period"]):
+                tran += ". "
+            # newline at the end of sentence
+            if return_bool(param_dict["eos_newline"]):
+                tran += "\n"
     return tran, lines, starts, ends
 
 
