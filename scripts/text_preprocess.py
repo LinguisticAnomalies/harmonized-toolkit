@@ -81,13 +81,15 @@ def clean_text(text_chunk, param_dict):
                 line = line.capitalize()
             # only add non-empty sentences
             # if line is not empty
-            if not return_bool(param_dict["timestamps_only"]):
+            # get transcripts without timestamp
+            if return_bool(param_dict["timestamp_only"]):
                 if len(line.strip()) > 0 and start != 0.0 and end != 0.0:
                     tran += line.strip()
                     lines.append(line.strip())
                     starts.append(start)
                     ends.append(end)
-            if return_bool(param_dict["timestamps_only"]):
+            # get timestamp only transcripts
+            if not return_bool(param_dict["timestamp_only"]):
                 tran += line.strip()
                 lines.append(line.strip())
                 starts.append(start)
@@ -162,8 +164,12 @@ def parse_dirs():
     full_cha_df["file"] = full_files
     full_cha_df["index"] = full_indexes
     full_cha_df["trans"] = full_lines
-    full_cha_df["start"] = full_starts
-    full_cha_df["end"] = full_ends
+    # if no timestamps availiable
+    if all(full_starts) == 0 and all(full_ends) == 0:
+        pass
+    else:
+        full_cha_df["start"] = full_starts
+        full_cha_df["end"] = full_ends
     full_cha_df.to_csv(out_cha_path, index=False)
     # rewrite param_dict with investigator timestep
     with open("text_process.json", "w") as json_file:
