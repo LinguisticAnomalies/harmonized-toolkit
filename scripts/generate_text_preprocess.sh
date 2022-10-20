@@ -2,7 +2,7 @@
 # !/bin/bash
 read -p "Which dataset you are pre-processing? wls or db?: "  dataset_choice
 read -p "Where are the .cha files located?: " input_path
-read -p "Do you want to pre-process files with timestamps only?: (Y/N)" timestamps_only
+read -p "Do you want to pre-process files with timestamps only?: (Y/N)" timestamp_only
 read -p "Remove 'clear throat'? (Y/N): " clear_thoat
 read -p "Remove open parentheses e.g, (be)coming? (Y/N): " open_parenthese
 read -p "Remove open square brackets eg. [: overflowing]? (Y/N): " open_brackets
@@ -13,6 +13,7 @@ read -p "Remove forward slashes in square brackets? (Y/N): " slashes
 read -p "Remove noise indicators e.g. &=breath? (Y/N): ": noise_indicators
 read -p "Remove square brackets indicating an error code? (Y/N): " brackets_error
 read -p "Remove all non alpha characters? (Y/N): " non_alpha_char
+
 read -p "Remove multiple spaces with a single space? (Y/N): " single_space
 read -p "Capitalize the first character? (Y/N): " cap_char
 read -p "Add period at the end of every sentence? (Y/N): " eos_period
@@ -21,7 +22,7 @@ read -p "You data will be stored as .tsv file. Please enter the output path and 
 echo "Please stand by, your pre-processing script will be generated shortly...\n"
 echo '{"dataset_choice": "'$dataset_choice'",
        "input_path": "'$input_path'",
-       "timestamp": "'$timestamps_only'",
+       "timestamp": "'$timestamp_only'",
        "clear_thoat": "'$clear_thoat'",
        "open_parenthese": "'$open_parenthese'",
        "open_brackets": "'$open_brackets'",
