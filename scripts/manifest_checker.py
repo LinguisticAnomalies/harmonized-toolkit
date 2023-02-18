@@ -32,7 +32,7 @@ def check_file(manifest_loc):
     manifest = read_json(manifest_loc)
     # You manifest must contain the following key-value pairs
     must_keys = [
-        'pre_process', 'data_uids', 'postive_uids', 'negative_uids', 'training_uids', 'test_uids', 'evaluation']
+        'pre_process', 'data_uids', 'positive_uids', 'negative_uids', 'training_uids', 'test_uids', 'evaluation']
     try:
         assert all(k in manifest.keys() for k in must_keys)
     except AssertionError:

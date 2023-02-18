@@ -1,6 +1,6 @@
-# The Harmonized Pre-processing Toolkit for Dementia Bank
+# TRESTLE
 
-This repository contains code developed for the harmonized pre-processing toolkit for Dementia Bank dataset
+This repository contains code developed for TRESTLE (Toolkit for Reproducible Execution of Speech Text and Language Experiments), an open source platform that focuses on two datasets from the TalkBank repository with dementia detection as an illustrative domain.
 
 While the data of Dementia Bank is publicly available, we are not able to redistribute any of these data as per Data Use agreement with Dementia Bank. Individual investigators need to contact the [Dementia Bank](https://dementia.talkbank.org/access/) to request access to the data.
 
@@ -12,39 +12,40 @@ For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/
 
 ## Usage
 
-### Pre-processing
+### Pre-Processing
 
-This toolkit has the following file structure
+This toolkit supports pre-processing of text and audio data for Pitt corpus and WLS dataset. Each module generates a corresponding `.json` file containing all user-defined parameters for pre-processing.
 
-```
-- audio folder
-    - pitt
-        - dementia
-        - control
-    - wls
-- transcript folder
-    - pitt
-        - dementia
-        - control
-    - wls
-- scripts
-	- generate_text_preprocess.sh
-	- text_preprocess.py
-	- generate_audio_preprocess.sh
-	- audio_preprocess.py
-```
+#### Text
 
-Both `generate_text_preprocess.sh` and `generate_audio_preprocess.sh` allow to select the data type, pre-processing parameters and input data folder to generate the corresponding cleaned dataset.
+To start the pre-processing, simply run `./generate_text_preprocess.sh` in your terminal.
 
-### Supported preprocessing arguments
+The design of the text module is shown below.
 
-For more details, please check the corresponding `.sh` file.
+![the overview of text module](files/TRESTLE-text.drawio.png)
+
+- Remove clear thoat indicator
+- Remove open parenthese or brackets
+- Remove disfluencies, unword, pauses
+- Remove noise indicator
+- Capitalize the first character
+- Add newline at the end of sentence
+- Save the pre-processed **participant-level** transcripts as a .tsv file
+- Save the pre-processed **utterance-level** transcripts as *_cha.csv file
+
 
 #### Audio
 
+The audio module only supports **fully aligned** data - the case where the text transcript has aligned audio timestamps for each utterance-level transcript. The pitt corpus is a fully aligned dataset. However, only a portion of the WLS dataset is fully aligned. Thus the applicibility of audio pre-processing for the WLS dataset is limited.
+
+To start the process, simply run `./generate_audio_preprocess.sh` in the terminal.
+
+The design of the audio module is shown below.
+![The overview of audio module](files/TRESTLE-audio.drawio.png)
+
 - Convert `.mp3` to `.wav`
 - Resample with user-defined sample rate
-- Trim out audio samples from investigators (**Note**: this feature only supports Dementia Bank Pitt corpus)
+- Trim out audio samples from investigators (**Note**: this feature only supports fully aligned audio recordings)
 - Feature extraction with Fourier transform
 - Feature extraction Mel-frequency cepstral coefficients
 - No feature extraction - keep the original audio time series array
@@ -57,54 +58,40 @@ import numpy as np
 data = np.load("data.npy", allow_pickle=False)
 ```
 
-#### Text
+#### Combined Pre-Processing
 
-- Remove clear thoat indicator
-- Remove open parenthese or brackets
-- Remove disfluencies, unword, pauses
-- Remove noise indicator
-- Capitalize the first character
-- Add newline at the end of sentence
-- Save the pre-processed transcripts as a .tsv file
+If you want to pre-process a dataset using text and audio at the same time, you can use `generate_full_preprocess.sh`. This is a combined shell script using prompts from the text and audio module.
 
-## Defining classes and data selection
+## For the Hackallenge
+
+### Defining Classes and Data Selection
 
 Participants are required to define their own label to the existing Dementia Bank and WLS dataset. More specifically, participants need to **define** each data samples as one of two categories "positive" vs. "negative" with provided metadata.
 
-## Analysis pipeline
+### Analysis Pipeline
 
 Participants are required to design their own analysis pipeline with the given pre-processing pipeline.
 
-## Reporting and Submitting Manifest
+### Reporting and Submitting Manifest
 
 While we do not ask participants to upload or share their analysis pipeline, participants need to report the details of their pre-processing, data seleciton and analysis pipeline in a **.json** file.
 
-We provide the baseline manifest as follows:
+Please find the baseline manifest in the ```files``` folder.
 
-```json
-{
-"pre_process": "scripts/text_process.json",
-# all data you use for your method
-"data_uids": ["001-2", "005-2", "006-4", "010-3",...],
-# all postive cases you defined 
-"postive_uids": ["001-2", "005-2", "018-0",...],
-# all negative cases you defined
-"negative_uids": ["006-4", "013-0", "015-3"],
-# all cases of your training set
-"training_uids": ["001-2", "005-2", "006-4", ...],
-# all cases of your test set
-"test_uids": ["035-1", "045-0", "049-1", ...],
-"method": "fine-tuning BERT base model with 10 epochs and 8 batch size on ADReSS training set, validatinng on ADReSS test set",
-"evaluation":
-{
-    "ACC@EER": 0.83,
-    "AUC@EER": 0.91,
-    "ACC": 0.77,
-    "AUC": 0.77
-}
+We also provide a simply script to valiate your manifest. Before sumitting, please run ``scripts/manifest_checker.py`` to make sure your manifest is validated.
+
+## Todo
+- [ ] Add support of WRAP dataset
+- [ ] Add support of `.texgrid` format
+- [ ] Add support of various dataset from TalkBank
+
+## Citation
+
+```bib
+@article{li2023trestle,
+  title={TRESTLE: Toolkit for Reproducible Execution of Speech, Text and Language Experiments},
+  author={Li, Changye and Cohen, Trevor and Michalowski, Martin and Pakhomov, Serguei},
+  journal={AMIA Informatics Summit},
+  year={2023}
 }
 ```
-
-## Known Issues
-
-Some .cha files did not align very well, which some audio samples from invetigators did not marked and thus did not get removed by this toolkit.
