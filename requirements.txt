@@ -1,8 +1,6 @@
 librosa
-sox
-scipy
-pydub
-sklearn
-numpy
 soundfile
-pandas
+pydub
+textgrid
+jsonlines
+tqdm
