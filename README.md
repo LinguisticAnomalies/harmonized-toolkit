@@ -1,97 +1,115 @@
 # TRESTLE
 
-This repository contains code developed for TRESTLE (Toolkit for Reproducible Execution of Speech Text and Language Experiments), an open source platform that focuses on two datasets from the TalkBank repository with dementia detection as an illustrative domain.
+This repository contains code developed for TRESTLE (Toolkit for Reproducible Execution of Speech Text and Language Experiments), an open source platform that focuses on text and audio preprocessing for corpora that follow CHAT and Praat's TextGrid protocols. TRESTLE is initially designed to execute preprocessing for two datasets from the TalkBank repository with dementia detection as an illustrative domain. It can be easily adapted to other corpora that support CHAT and TextGrid protocols. The TextGrid functionalities are supported by the [textgrid](https://github.com/kylebgorman/textgrid) package.
 
-While the data of Dementia Bank is publicly available, we are not able to redistribute any of these data as per Data Use agreement with Dementia Bank. Individual investigators need to contact the [Dementia Bank](https://dementia.talkbank.org/access/) to request access to the data.
 
 ## Setup
+Please install dependency packages using `pip install -r requirements.txt` or `conda install --yes --file requirements.txt` with Python version at least 3.8.
 
-It is recommended to use a virtual environment (i.e.,  [venv](https://docs.python.org/3/tutorial/venv.html), [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/), or [conda](https://docs.conda.io/en/latest/)) to use and develop this toolkit. Please install dependency packages using ```pip install -r requirements.txt``` or ```conda install --yes --file requirements.txt``` with python version at least 3.8.
-
-For audio preprocessing, please also install [FFmpeg](https://github.com/FFmpeg/FFmpeg) and [sox](https://github.com/rabitt/pysox) on your local system.
+Please also make sure you have [FFmpeg](https://ffmpeg.org/) installed.
 
 ## Usage
 
-### Pre-Processing
+### Text Preprocessing
 
-This toolkit supports pre-processing of text and audio data for Pitt corpus and WLS dataset. Each module generates a corresponding `.json` file containing all user-defined parameters for pre-processing.
-
-#### Text
-
-To start the pre-processing, simply run `./generate_text_preprocess.sh` in your terminal.
-
-The design of the text module is shown below.
-
-![the overview of text module](files/TRESTLE-text.drawio.png)
-
-- Remove clear thoat indicator
-- Remove open parenthese or brackets
-- Remove disfluencies, unword, pauses
-- Remove noise indicator
-- Capitalize the first character
-- Add newline at the end of sentence
-- Save the pre-processed **participant-level** transcripts as a .tsv file
-- Save the pre-processed **utterance-level** transcripts as *_cha.csv file
-
-
-#### Audio
-
-The audio module only supports **fully aligned** data - the case where the text transcript has aligned audio timestamps for each utterance-level transcript. The pitt corpus is a fully aligned dataset. However, only a portion of the WLS dataset is fully aligned. Thus the applicibility of audio pre-processing for the WLS dataset is limited.
-
-To start the process, simply run `./generate_audio_preprocess.sh` in the terminal.
-
-The design of the audio module is shown below.
-![The overview of audio module](files/TRESTLE-audio.drawio.png)
-
-- Convert `.mp3` to `.wav`
-- Resample with user-defined sample rate
-- Trim out audio samples from investigators (**Note**: this feature only supports fully aligned audio recordings)
-- Feature extraction with Fourier transform
-- Feature extraction Mel-frequency cepstral coefficients
-- No feature extraction - keep the original audio time series array
-- Save the audio time series array to local `.npy` files
-
-To load `.npy` file:
+TRESTLE supports user-defined regex patterns for text-prerpcessing. To start, one needs to define regex patterns by initializing a python dictionary:
 
 ```python
-import numpy as np
-data = np.load("data.npy", allow_pickle=False)
+# Define regex patterns for text preprocessing
+txt_patterns = {
+        r'\([^)]*\)': "",
+        r'(\w)\1\1': '',
+        r'\[.*?\]': "",
+        r'&-(\w+)': r'\1',
+        r'&+(\w+)': r'\1',
+        r'<(\w+)>': r'\1',
+        r'\+...': "",
+        r'[^A-Za-z\n \']': '',
+        r'\s+': ' ',
+    }
 ```
 
-#### Combined Pre-Processing
+Users also need to define a dictionary containing pointers to the input text/audio and save locations for output. In this dictionary, users also need to specify the format of input text  (i.e., `.cha` or `.TextGrid`), the audio format (i.e., `.mp3` or `.wav`). The `speaker` is the required field for CHAT transcripts to indicate the utterance to be preprocessed. If it has multiple tasks in a CHAT transcript, users can use `content` to specify the subset for further preprocessing.
 
-If you want to pre-process a dataset using text and audio at the same time, you can use `generate_full_preprocess.sh`. This is a combined shell script using prompts from the text and audio module.
+Please note that the paths should be full path.
 
-## For the Hackallenge
+```python
+sample = {
+  "format": ".cha",
+  "text_input_path":"/path/to/input/txt",
+  "audio_input_path": "/path/to/audio/recordings",
+  "text_output_path": "/path/to/output/txt",
+  "audio_output_path": "/path/to/output/audio/recording",
+  "audio_type": ".mp3",
+  "speaker": "*PAR",
+  "content": r'@Bg:	Activity\n.*?@Eg:	Activity'
+  }
+```
 
-### Defining Classes and Data Selection
+Users can start preprocessing by:
 
-Participants are required to define their own label to the existing Dementia Bank and WLS dataset. More specifically, participants need to **define** each data samples as one of two categories "positive" vs. "negative" with provided metadata.
+```python
+from TRESTLE import TextWrapperProcessor
+wrapper_processor = TextWrapperProcessor(
+    data_loc=sample, txt_patterns=txt_patterns)
+wrapper_processor.process()
+```
 
-### Analysis Pipeline
+The utterance-level transcript will be saved to the `text_output_path` as a .jsonline file with the following structure:
 
-Participants are required to design their own analysis pipeline with the given pre-processing pipeline.
+```jsonline
+{"start": 0.0, "end": 6875.0, "text": "one does not simply walk in to mordor", "audio": "/path/to/the/recording/file_name.wav"}
+```
 
-### Reporting and Submitting Manifest
+### Audio Preprocessing
 
-While we do not ask participants to upload or share their analysis pipeline, participants need to report the details of their pre-processing, data seleciton and analysis pipeline in a **.json** file.
+To preprocess the audio recordings, users need to run text preprocessing first to get the utterance-level transcripts. The audio preprocessing module is designed to resample the input audio recordings and slice them into utterance-level audio clips. Users can start audio preprocessing by:
 
-Please find the baseline manifest in the ```files``` folder.
+```python
+processor = AudioProcessor(
+  data_loc=sample, sample_rate=16000)
+processor.process_audio()
+```
 
-We also provide a simply script to valiate your manifest. Before sumitting, please run ``scripts/manifest_checker.py`` to make sure your manifest is validated.
+The audio output folder with the following structure:
 
-## Todo
-- [ ] Add support of WRAP dataset
-- [ ] Add support of `.texgrid` format
-- [ ] Add support of various dataset from TalkBank
+```
+├── audio_output_path
+│   ├── metadata.csv
+│   ├── file_name_1.wav
+│   ├── file_name_2.wav
+│   ├── file_name_3.wav
+```
+
+The metadata.csv files stores the audio clips and corrsponding transcript with the following structure:
+
+```
+file_name,transcription
+file_name_1.wav,one does not simply walk into mordor
+```
+
+
+## AAAI 2022 Hackallenge
+
+Read more [here](hackallenge.md).
+
+## TODO
+
+- [ ] wrap into a python package
+
 
 ## Citation
+
+If you use TRESTLE in your research, please cite our paper via:
 
 ```bib
 @article{li2023trestle,
   title={TRESTLE: Toolkit for Reproducible Execution of Speech, Text and Language Experiments},
-  author={Li, Changye and Cohen, Trevor and Michalowski, Martin and Pakhomov, Serguei},
-  journal={AMIA Informatics Summit},
-  year={2023}
+  author={Li, Changye and Xu, Weizhe and Cohen, Trevor and Michalowski, Martin and Pakhomov, Serguei},
+  journal={AMIA Summits on Translational Science Proceedings},
+  volume={2023},
+  pages={360},
+  year={2023},
+  publisher={American Medical Informatics Association}
 }
 ```
