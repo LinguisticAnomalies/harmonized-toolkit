@@ -41,8 +41,9 @@ class ChaProcessor:
         speaker = self.data_loc.get("speaker", "")
         for cha_file in tqdm(self.files, desc="Processing cha files"):
             file_name, _ = os.path.splitext(os.path.basename(cha_file))
+            file_name = str(file_name)
             output_file_path = os.path.join(
-                    self.data_loc['text_output_path'], f"{str(file_name)}.jsonl")
+                    self.data_loc['text_output_path'], f"{file_name}.jsonl")
             audio_file = self.data_loc.get('audio_input_path', '') and \
                     os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}") or ""
             with open(cha_file, encoding='utf-8') as file_content:
@@ -75,39 +76,6 @@ class TextGridProcessor:
         self.data_loc = data_loc
         self.txt_patterns = txt_patterns
         self.files = files
-    
-    @staticmethod
-    def get_key_by_value(search_dict, search_value):
-        """
-        Use next to get the first key where the value matches, or None if not found
-        NOTE: assume that the value is unique
-
-        :param search_dict: the dictionary to search
-        :type search_dict: dict
-        :param search_value: the value to search for the key
-        :type search_value: str
-        :return: the key, if not found, then return None
-        :rtype: str/None
-        """
-        return next((key for key, value in search_dict.items() if \
-                     value == search_value), None)
-    
-    def get_ccc_speakers(self):
-        """
-        Get speakers' name and ids from metadata
-
-        :return: Speaker ids and speakers name
-        :rtype: dict
-        """
-        ccc_spkrs = {}
-        with open(self.data_loc["meta_file"], 'r', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                if row['corpus_name'] == "CCC" and row['role'] == "interviewee":
-                    speaker_number = row['speaker_number']
-                    speaker_name = row['name'].lower().strip()
-                    ccc_spkrs[speaker_number] = speaker_name
-        return ccc_spkrs
 
 
     def clean_text(self, text):
@@ -116,24 +84,18 @@ class TextGridProcessor:
         :param text: the CCC transcript for pre-processing
         :type text: str
         """
-        text = text.lower().strip()
         for pattern, replacement in self.txt_patterns.items():
             text = re.sub(pattern, replacement, text)
-        text = text.strip()
-        return text
-    
+        return text.lower().strip()
 
-    def process_tier(self, tg, spkrs, tg_file, spkrs_names, audio_file):
+
+    def process_tier(self, tg, tg_file, audio_file):
         """
         Common logic for processing tiers
         """
         for tier in tg:
-            tier_name = tier.name.lower().strip() if spkrs else tier.name
-            pid = self.get_key_by_value(spkrs, tier_name) if spkrs else None
-            if spkrs and "transcript" not in tier_name and tier_name in spkrs_names and pid:
-                output_file_path = os.path.join(
-                    self.data_loc['text_output_path'], f"{str(pid)}.jsonl")
-            elif not spkrs:
+            tier_name = tier.name.lower().strip()
+            if "transcript" not in tier_name:
                 file_name, _ = os.path.splitext(os.path.basename(tg_file))
                 output_file_path = os.path.join(
                     self.data_loc['text_output_path'], f"{file_name}.jsonl")
@@ -148,15 +110,10 @@ class TextGridProcessor:
                             "text": self.clean_text(item.mark),
                             "audio": audio_file}
                         writer.write(record)
-    
+
 
     def clean_textgrid(self):
         os.makedirs(self.data_loc['text_output_path'], exist_ok=True)
-        spkrs = None
-        # CCC speaker ids
-        if "data_type" in self.data_loc and self.data_loc["data_type"].lower() == "ccc":
-            spkrs = self.get_ccc_speakers()
-        spkrs_names = set(spkrs.values()) if spkrs else set()
         audio_type = self.data_loc.get('audio_type', '')
         for tg_file in tqdm(self.files, desc="Processing TextGrid files"):
             try:
@@ -165,10 +122,13 @@ class TextGridProcessor:
                 audio_file = self.data_loc.get('audio_input_path', '') and \
                     os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}") or ""
                 if os.path.exists(audio_file):
-                    self.process_tier(tg, spkrs, tg_file, spkrs_names, audio_file)
+                    self.process_tier(tg, tg_file, audio_file)
+                else:
+                    self.process_tier(tg, tg_file, "")
             except ValueError:
                 continue
-    
+
+
 class TextWrapperProcessor:
     def __init__(self, data_loc, txt_patterns):
         self.data_loc = data_loc
@@ -192,7 +152,7 @@ class TextWrapperProcessor:
             raise ValueError(f"Unsupported format: {self.data_loc['format']}")
         self.processor.files = glob(
             os.path.join(self.data_loc['text_input_path'], f"*{self.data_loc['format']}"))
-    
+
 
     def process(self):
         if isinstance(self.processor, ChaProcessor):
@@ -201,7 +161,7 @@ class TextWrapperProcessor:
             self.processor.clean_textgrid()
         else:
             raise ValueError(f"Unsupported processor type: {type(self.processor)}")
-    
+
 
 class AudioProcessor:
     AUDIO_FORMAT = 'wav'
@@ -215,7 +175,7 @@ class AudioProcessor:
     def get_text_files(self):
         pattern = os.path.join(self.data_loc['text_output_path'], "*.jsonl")
         self.text_files = glob(pattern)
-    
+
 
     def process_audio(self):
         os.makedirs(self.data_loc['audio_output_path'], exist_ok=True)
@@ -248,5 +208,6 @@ class AudioProcessor:
             sliced_audio.export(new_file_path, format=self.AUDIO_FORMAT)
         except FileNotFoundError:
             print(f"Audio file not found: {audio_file}")
+            pass
         except pydub.exceptions.CouldntDecodeError:
-            print(pydub.utils.mediainfo(audio_file))
+            pass
