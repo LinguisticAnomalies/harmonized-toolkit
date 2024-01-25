@@ -14,6 +14,7 @@ class ChaProcessor:
         self.txt_patterns = txt_patterns
         self.files = files
 
+
     def clean_text(self, text, speaker):
         """
         basic pre-processing for .cha transcripts
@@ -29,7 +30,7 @@ class ChaProcessor:
         for pattern, replacement in self.txt_patterns.items():
             text = re.sub(pattern, replacement, text)
         return start, end, text.lower().strip()
-    
+
 
     def clean_cha(self):
         """
@@ -54,7 +55,7 @@ class ChaProcessor:
                         all_tran = re.search(
                             content_mark, all_tran, re.DOTALL).group()
                     except AttributeError:
-                        continue
+                        all_tran = ""
                 # for windows line breakers
                 all_tran = re.sub(r"\r\n|\n|((\*|\%|\@)[A-Za-z]+\:)", r" \n\1", all_tran)
                 all_sents = all_tran.split("\n")
@@ -76,6 +77,22 @@ class TextGridProcessor:
         self.data_loc = data_loc
         self.txt_patterns = txt_patterns
         self.files = files
+
+    @staticmethod
+    def get_key_by_value(search_dict, search_value):
+        """
+        Use next to get the first key where the value matches, or None if not found
+        NOTE: assume that the value is unique
+
+        :param search_dict: the dictionary to search
+        :type search_dict: dict
+        :param search_value: the value to search for the key
+        :type search_value: str
+        :return: the key, if not found, then return None
+        :rtype: str/None
+        """
+        return next((key for key, value in search_dict.items() if \
+                     value == search_value), None)
 
 
     def clean_text(self, text):
@@ -181,17 +198,20 @@ class AudioProcessor:
         os.makedirs(self.data_loc['audio_output_path'], exist_ok=True)
         metadata = [['file_name', 'transcription']]
 
-        for utter_file in self.text_files:
+        for utter_file in tqdm(self.text_files, desc="Processing audio files"):
             file_name, _ = os.path.splitext(os.path.basename(utter_file))
             with jsonlines.open(utter_file, 'r') as jsonl_f:
                 utters = [obj for obj in jsonl_f]
 
                 for i, record in enumerate(utters):
-                    new_file_name = f"{file_name}_{i}.{self.AUDIO_FORMAT}"
-                    new_file_path = os.path.join(
-                        self.data_loc['audio_output_path'], new_file_name)
-                    self.resample_and_slide(new_file_path, record)
-                    metadata.append([new_file_name, record['text']])
+                    if record['audio'] and os.path.exists(record['audio']):
+                        new_file_name = f"{file_name}_{i}.{self.AUDIO_FORMAT}"
+                        new_file_path = os.path.join(
+                            self.data_loc['audio_output_path'], new_file_name)
+                        self.resample_and_slide(new_file_path, record)
+                        metadata.append([new_file_name, record['text']])
+                    else:
+                        continue
 
         # Save metadata
         metadata_file = os.path.join(
@@ -207,7 +227,6 @@ class AudioProcessor:
             sliced_audio = audio[record['start']:record['end']]
             sliced_audio.export(new_file_path, format=self.AUDIO_FORMAT)
         except FileNotFoundError:
-            print(f"Audio file not found: {audio_file}")
             pass
         except pydub.exceptions.CouldntDecodeError:
             pass
