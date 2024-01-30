@@ -1,10 +1,10 @@
 import csv
 import os
 import re
+import json
 from glob import glob
 from tqdm import tqdm
 import textgrid
-import jsonlines
 import pydub
 
 
@@ -13,6 +13,7 @@ class ChaProcessor:
         self.data_loc = data_loc
         self.txt_patterns = txt_patterns
         self.files = files
+
 
     def clean_text(self, text, speaker):
         """
@@ -29,7 +30,7 @@ class ChaProcessor:
         for pattern, replacement in self.txt_patterns.items():
             text = re.sub(pattern, replacement, text)
         return start, end, text.lower().strip()
-    
+
 
     def clean_cha(self):
         """
@@ -40,12 +41,16 @@ class ChaProcessor:
         content_mark = self.data_loc.get("content", "")
         speaker = self.data_loc.get("speaker", "")
         for cha_file in tqdm(self.files, desc="Processing cha files"):
+            records = []
             file_name, _ = os.path.splitext(os.path.basename(cha_file))
             file_name = str(file_name)
             output_file_path = os.path.join(
                     self.data_loc['text_output_path'], f"{file_name}.jsonl")
-            audio_file = self.data_loc.get('audio_input_path', '') and \
-                    os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}") or ""
+            if self.data_loc.get('audio_input_path', '') and \
+                os.path.exists(os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}")):
+                audio_file = os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}")
+            else:
+                audio_file = ""
             with open(cha_file, encoding='utf-8') as file_content:
                 all_tran = file_content.read()
                 if content_mark:
@@ -54,7 +59,7 @@ class ChaProcessor:
                         all_tran = re.search(
                             content_mark, all_tran, re.DOTALL).group()
                     except AttributeError:
-                        continue
+                        all_tran = ""
                 # for windows line breakers
                 all_tran = re.sub(r"\r\n|\n|((\*|\%|\@)[A-Za-z]+\:)", r" \n\1", all_tran)
                 all_sents = all_tran.split("\n")
@@ -67,15 +72,19 @@ class ChaProcessor:
                                 "end": end,
                                 "text": new_sent,
                                 "audio": audio_file}
-                            with jsonlines.open(output_file_path, mode="a") as writer:
-                                writer.write(record)
+                            records.append(record)
+            with open(output_file_path, "w") as jsonl_file:
+                for item in records:
+                    json.dump(item, jsonl_file)
+                    jsonl_file.write("\n")
 
 
 class TextGridProcessor:
-    def __init__(self, data_loc, txt_patterns, files):
+    def __init__(self, data_loc, txt_patterns, files, data_type):
         self.data_loc = data_loc
         self.txt_patterns = txt_patterns
         self.files = files
+        self.data_type = data_type
 
 
     def clean_text(self, text):
@@ -93,15 +102,13 @@ class TextGridProcessor:
         """
         Common logic for processing tiers
         """
+        records = []
+        file_name, _ = os.path.splitext(os.path.basename(tg_file))
+        output_file_path = os.path.join(
+            self.data_loc['text_output_path'], f"{file_name}.jsonl")
         for tier in tg:
             tier_name = tier.name.lower().strip()
-            if "transcript" not in tier_name:
-                file_name, _ = os.path.splitext(os.path.basename(tg_file))
-                output_file_path = os.path.join(
-                    self.data_loc['text_output_path'], f"{file_name}.jsonl")
-            else:
-                continue
-            with jsonlines.open(output_file_path, mode="a") as writer:
+            if file_name.lower() == tier_name:
                 for item in tier:
                     if self.clean_text(item.mark):
                         record = {
@@ -109,22 +116,68 @@ class TextGridProcessor:
                             "end": item.maxTime*1000,
                             "text": self.clean_text(item.mark),
                             "audio": audio_file}
-                        writer.write(record)
+                        records.append(record)
+        with open(output_file_path, "w") as jsonl_file:
+            for item in records:
+                json.dump(item, jsonl_file)
+                jsonl_file.write("\n")
+
+
+    def process_ccc_tier(self, tg, tg_file, speaker, audio_file):
+        """
+        special logic for preprocessing CCC corpus
+
+        :param tg: the textgrid content
+        :type tg: textgrid.textgrid.TextGrid
+        :param tg_file: the path to the textgrid file
+        :type tg_file: str
+        :param speaker: the indicator (i.e., id, or particial name) of the speaker
+        :type speaker: str
+        :param audio_file: the location to the audio recording
+        :type audio_file: str
+        """
+        records = []
+        file_name, _ = os.path.splitext(os.path.basename(tg_file))
+        output_file_path = os.path.join(
+            self.data_loc['text_output_path'], f"{file_name}.jsonl")
+        for tier in tg:
+            tier_name = tier.name.lower().strip()
+            if speaker.lower() in tier_name and \
+                "transcript" not in tier_name:
+                if tier_name.startswith("i "):
+                    continue
+                else:
+                    for item in tier:
+                        if self.clean_text(item.mark):
+                            record = {
+                                "start": item.minTime*1000,
+                                "end": item.maxTime*1000,
+                                "text": self.clean_text(item.mark),
+                                "audio": audio_file}
+                            records.append(record)
+        with open(output_file_path, "w") as jsonl_file:
+            for item in records:
+                json.dump(item, jsonl_file)
+                jsonl_file.write("\n")
 
 
     def clean_textgrid(self):
         os.makedirs(self.data_loc['text_output_path'], exist_ok=True)
         audio_type = self.data_loc.get('audio_type', '')
+        self.files = [item for item in self.files if not item.split("/")[-1][0].isdigit()]
         for tg_file in tqdm(self.files, desc="Processing TextGrid files"):
             try:
                 tg = textgrid.TextGrid.fromFile(tg_file)
                 file_name, _ = os.path.splitext(os.path.basename(tg_file))
                 audio_file = self.data_loc.get('audio_input_path', '') and \
-                    os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}") or ""
-                if os.path.exists(audio_file):
-                    self.process_tier(tg, tg_file, audio_file)
+                    os.path.join(self.data_loc['audio_input_path'], f"{file_name}{audio_type}")
+                if not os.path.exists(audio_file):
+                    audio_file = ""
+                if self.data_type.lower() == "ccc":
+                    speaker_name = file_name.split("_")[0]
+                    self.process_ccc_tier(tg, tg_file, speaker_name, audio_file)
                 else:
-                    self.process_tier(tg, tg_file, "")
+                    self.process_tier(tg, tg_file, audio_file)
             except ValueError:
                 continue
 
@@ -135,6 +188,7 @@ class TextWrapperProcessor:
         self.txt_patterns = txt_patterns
         self.processor = None
         self.files = []
+        self.data_type = self.data_loc.get('data_type', '')
         self.get_files()
 
     def get_files(self):
@@ -142,12 +196,14 @@ class TextWrapperProcessor:
             self.processor = ChaProcessor(
                 data_loc=self.data_loc,
                 txt_patterns=self.txt_patterns,
-                files=self.files)
+                files=self.files,
+                data_type = self.data_type)
         elif self.data_loc['format'] == '.TextGrid':
             self.processor = TextGridProcessor(
                 data_loc=self.data_loc,
                 txt_patterns=self.txt_patterns,
-                files=self.files)
+                files=self.files,
+                data_type=self.data_type)
         else:
             raise ValueError(f"Unsupported format: {self.data_loc['format']}")
         self.processor.files = glob(
@@ -181,17 +237,20 @@ class AudioProcessor:
         os.makedirs(self.data_loc['audio_output_path'], exist_ok=True)
         metadata = [['file_name', 'transcription']]
 
-        for utter_file in self.text_files:
+        for utter_file in tqdm(self.text_files, desc="Processing audio files"):
             file_name, _ = os.path.splitext(os.path.basename(utter_file))
-            with jsonlines.open(utter_file, 'r') as jsonl_f:
-                utters = [obj for obj in jsonl_f]
+            with open(utter_file, "r") as jsonl_f:
+                utters = [json.loads(line) for line in jsonl_f]
 
                 for i, record in enumerate(utters):
-                    new_file_name = f"{file_name}_{i}.{self.AUDIO_FORMAT}"
-                    new_file_path = os.path.join(
-                        self.data_loc['audio_output_path'], new_file_name)
-                    self.resample_and_slide(new_file_path, record)
-                    metadata.append([new_file_name, record['text']])
+                    if record['audio'] and os.path.exists(record['audio']):
+                        new_file_name = f"{file_name}_{i}.{self.AUDIO_FORMAT}"
+                        new_file_path = os.path.join(
+                            self.data_loc['audio_output_path'], new_file_name)
+                        self.resample_and_slide(new_file_path, record)
+                        metadata.append([new_file_name, record['text']])
+                    else:
+                        continue
 
         # Save metadata
         metadata_file = os.path.join(
@@ -207,7 +266,6 @@ class AudioProcessor:
             sliced_audio = audio[record['start']:record['end']]
             sliced_audio.export(new_file_path, format=self.AUDIO_FORMAT)
         except FileNotFoundError:
-            print(f"Audio file not found: {audio_file}")
             pass
         except pydub.exceptions.CouldntDecodeError:
             pass
