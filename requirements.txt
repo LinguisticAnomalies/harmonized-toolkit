@@ -1,4 +1,3 @@
 pydub
 textgrid
-jsonlines
 tqdm

@@ -61,6 +61,22 @@ The utterance-level transcript will be saved to the `text_output_path` as a .jso
 {"start": 0.0, "end": 6875.0, "text": "one does not simply walk in to mordor", "audio": "/path/to/the/recording/file_name.wav"}
 ```
 
+#### Note
+TRESTLE assumes that the the file names for the text transcript and audio recording for each participant stay the same. If a .TextGrid corpus that presents special tier naming convention, one can add a special `data_type` key-value pair in the following setup:
+
+```python
+sample = {
+  "format": ".TextGrid",
+  "text_input_path":"/path/to/input/txt",
+  "audio_input_path": "/path/to/audio/recordings",
+  "text_output_path": "/path/to/output/txt",
+  "audio_output_path": "/path/to/output/audio/recording",
+  "audio_type": ".mp3",
+  "data_type": "a_special_mark",
+  }
+```
+Then modify the processing rule in the `clean_textgird` and `process_special_tier` functions in the `TextGridProcessor` class accordingly.
+
 ### Audio Preprocessing
 
 To preprocess the audio recordings, users need to run text preprocessing first to get the utterance-level transcripts. The audio preprocessing module is designed to resample the input audio recordings and slice them into utterance-level audio clips. Users can start audio preprocessing by:
@@ -92,10 +108,6 @@ file_name_1.wav,one does not simply walk into mordor
 ## AAAI 2022 Hackallenge
 
 Read more [here](hackallenge.md).
-
-## TODO
-
-- [ ] wrap into a python package
 
 
 ## Citation
