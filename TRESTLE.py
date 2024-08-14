@@ -61,7 +61,7 @@ class ChaProcessor:
                     except AttributeError:
                         all_tran = ""
                 # for windows line breakers
-                all_tran = re.sub(r"\r\n|\n|((\*|\%|\@)[A-Za-z]+\:)", r" \n\1", all_tran)
+                all_tran = re.sub(r"\n\s+", " ", all_tran)
                 all_sents = all_tran.split("\n")
                 for each_sent in all_sents:
                     if re.match(rf"\*{speaker}:", each_sent):
@@ -197,7 +197,7 @@ class TextWrapperProcessor:
                 data_loc=self.data_loc,
                 txt_patterns=self.txt_patterns,
                 files=self.files,
-                data_type = self.data_type)
+            )
         elif self.data_loc['format'] == '.TextGrid':
             self.processor = TextGridProcessor(
                 data_loc=self.data_loc,
