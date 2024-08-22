@@ -28,7 +28,11 @@ class ChaProcessor:
             text = re.sub(pattern.group(1), '', text)
         text = re.sub(speaker, '', text)
         for pattern, replacement in self.txt_patterns.items():
-            text = re.sub(pattern, replacement, text)
+            try:
+                pattern = re.compile(pattern)
+                text = re.sub(pattern, replacement, text)
+            except re.error:
+                pass
         return start, end, text.lower().strip()
 
 
@@ -64,7 +68,7 @@ class ChaProcessor:
                 all_tran = re.sub(r"\n\s+", " ", all_tran)
                 all_sents = all_tran.split("\n")
                 for each_sent in all_sents:
-                    if re.match(rf"\*{speaker}:", each_sent):
+                    if re.match(rf"\*{speaker}:\s+", each_sent):
                         start, end, new_sent = self.clean_text(each_sent, rf"\*{speaker}:")
                         if new_sent:
                             record = {
