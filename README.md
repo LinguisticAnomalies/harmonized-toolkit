@@ -49,7 +49,7 @@ sample = {
 Users can start preprocessing by:
 
 ```python
-from TRESTLE import TextWrapperProcessor
+from trestle import TextWrapperProcessor
 wrapper_processor = TextWrapperProcessor(
     data_loc=sample, txt_patterns=txt_patterns)
 wrapper_processor.process()
@@ -82,6 +82,7 @@ Then modify the processing rule in the `clean_textgird` and `process_special_tie
 To preprocess the audio recordings, users need to run text preprocessing first to get the utterance-level transcripts. The audio preprocessing module is designed to resample the input audio recordings and slice them into utterance-level audio clips. Users can start audio preprocessing by:
 
 ```python
+from trestle import AudioProcessor
 processor = AudioProcessor(
   data_loc=sample, sample_rate=16000)
 processor.process_audio()
