@@ -68,8 +68,8 @@ class ChaProcessor:
                 all_tran = re.sub(r"\n\s+", " ", all_tran)
                 all_sents = all_tran.split("\n")
                 for each_sent in all_sents:
-                    if re.match(rf"\*{speaker}:\s+", each_sent):
-                        start, end, new_sent = self.clean_text(each_sent, rf"\*{speaker}:")
+                    if re.match(rf"\{speaker}:\s+", each_sent):
+                        start, end, new_sent = self.clean_text(each_sent, rf"\{speaker}:")
                         if new_sent:
                             record = {
                                 "start": start,
