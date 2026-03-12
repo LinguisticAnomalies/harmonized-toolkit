@@ -1,10 +1,8 @@
-import os
 from pathlib import Path
 from typing import Any
 from dataclasses import dataclass
 from tqdm import tqdm
 import torchaudio
-import torch
 from torch.utils.data import Dataset
 from pydub import AudioSegment
 import polars as pl
@@ -30,7 +28,7 @@ class AudioClipper(BatchWrapperBase):
             format: str='parquet'):
         super().__init__(
             corpus=corpus,
-            root=text_root,
+            root=Path(text_root) / corpus,
             out_root=out_root,
             modality_dir='clips'
         )
@@ -39,6 +37,9 @@ class AudioClipper(BatchWrapperBase):
         self.format = format
     
     def _iter_files(self):
+        if not self.root.exists():
+            raise FileNotFoundError(self.root)
+
         return self.root.rglob(f"*_utterance.{self.format}")
 
     def _make_batch(self, subset, suffix, files):
@@ -52,49 +53,52 @@ class AudioClipper(BatchWrapperBase):
     def run(self):
         for batch in self.iter_batches():
             out_dir = self.resolve_out_dir(batch)
-            meta_path = out_dir / f'metadata_.{self.format}'
+            meta_path = out_dir / f'metadata.{self.format}'
 
             records: list[dict[str, Any]]=[]
 
             for text_file in tqdm(batch.text_files, desc=f"Clipping audio in {self.corpus}"):
                 task = text_file.stem.split("_")[0]
-                
-                input_df = pl.read_parquet(text_file).head(n=100)
+
+                input_df = pl.read_parquet(text_file)
                 for (pid,), pid_df in input_df.group_by("pid"):
                     for n, row in enumerate(pid_df.iter_rows(named=True)):
                         src = Path(row["audio_path"])
 
                         clip_name = f"{task}_{pid}_{n}.wav"
-                        clip_path = out_dir / clip_name
+                        clip_path = (out_dir / clip_name).resolve()
 
-                        if self.dry_run:
-                            # print(f"[DRY] {src} -> {clip_path}")
-                            records.append(
-                                {
+                        record = {
                                     "clip_path": str(clip_path),
                                     "pid": pid,
-                                    "task": task,
                                     "text": row["text"],
                                     "source_audio": str(src.resolve()),
                                 }
-                            )
+
+                        if self.dry_run:
+                            records.append(record)
                             continue
 
                         audio = AudioSegment.from_file(src)
+                        audio_len = len(audio)
+                        
                         start = row['start']
                         end = row['end']
+                        # handle empty clips
+                        if end <= start:
+                            continue
+                        if start < 0 or end > audio_len:
+                            continue
+
                         sliced_audio = audio[start:end]
+
+                        if len(sliced_audio) == 0:
+                            continue
+                        
                         sliced_audio.export(clip_path, format='wav')
 
-                        records.append(
-                            {
-                                "clip_path": str(clip_path.relative_to(self.out_root)),
-                                "pid": pid,
-                                "task": task,
-                                "text": row["text"],
-                                "source_audio": str(src.resolve()),
-                            }
-                        )
+                        records.append(record)
+            
             if records:
                 meta_df = pl.DataFrame(records)
 
@@ -111,54 +115,52 @@ class AudioClipper(BatchWrapperBase):
                         meta_df.write_csv(meta_path)
 
 
-class AudioUtils:
-    @staticmethod
-    def init_env_for_mp() -> None:
+class AudioClipDataset(Dataset):
+    def __init__(
+        self,
+        meta_path: Path,
+        root: Path | None = None,
+        subset: str | None = None,
+        limit: int | None = None
+    ):
         """
-        - Silence huggingface/tokenizers fork warning.
-        - Use 'spawn' to avoid forking after HF objects are created.
+        meta_path: path to metadata.parquet
+        root: base dir for relative clip_path (defaults to meta_path parent)
+        return_text: return reference text if available
         """
-        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-        try:
-            import multiprocessing as mp
-            if mp.get_start_method(allow_none=True) != "spawn":
-                mp.set_start_method("spawn", force=True)
-        except Exception:
-            pass
+        self.meta_path = Path(meta_path)
+        self.root = root or self.meta_path.parent
+        df = pl.read_parquet(self.meta_path)
 
-    @staticmethod
-    def ensure_ffmpeg_backend() -> None:
-        try:
-            torchaudio.set_audio_backend("ffmpeg")
-        except Exception as e:
-            raise RuntimeError(
-                "torchaudio must use the 'ffmpeg' backend (install torchaudio==2.8 with FFmpeg)."
-            ) from e
+        if subset is None:
+            subset = self.meta_path.parent.name
 
-    @staticmethod
-    def fast_duration(path: str) -> float:
-        """Probe duration without full decode."""
-        info = torchaudio.info(path)
-        if info.sample_rate <= 0:
-            return 0.0
-        return info.num_frames / info.sample_rate
+        self.subset = subset
+        if "subset" in df.columns:
+            df = df.filter(pl.col("subset") == subset)
 
+        if limit is not None:
+            df = df.head(limit)
 
-class AudioDataset(Dataset):
-    def __init__(self, items: list[tuple[str, float]], target_sr: int = 16_000):
-        self.items = items
-        self.target_sr = int(target_sr)
+        self.df = df
 
     def __len__(self):
-        return len(self.items)
+        return self.df.height
+    
+    def __getitem__(self, idx):
+        row = self.df.row(idx, named=True)
+        audio_path = self.root / row["clip_path"]
+        try:
+            waveform, sr = torchaudio.load(audio_path)
+        except RuntimeError:
+            print(f"Decode failed: {audio_path}")
+            return None
 
-    def __getitem__(self, idx: int):
-        path, _ = self.items[idx]
-        wav, sr = torchaudio.load(path)
-        if wav.size(0) > 1:
-            wav = wav.mean(dim=0, keepdim=True)
-        if sr != self.target_sr:
-            wav = torchaudio.functional.resample(wav, sr, self.target_sr)
-            sr = self.target_sr
-        wav_np = wav.squeeze(0).to(torch.float32).cpu().numpy()
-        return {"path": path, "waveform": wav_np, "sr": sr}
+        sample = {
+            "waveform": waveform.squeeze(0).numpy(),
+            "sampling_rate": sr,
+            "clip_path": str(audio_path),
+            "transcription": row.get("text"),
+        }
+
+        return sample

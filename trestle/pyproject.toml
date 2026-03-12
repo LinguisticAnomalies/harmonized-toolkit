@@ -5,6 +5,7 @@ description = "Toolkit for Reproducible Speech, Text, and Language Experiments"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "accelerate>=1.13.0",
   "flash-attn",
   "ninja>=1.13.0",
   "packaging>=26.0",
