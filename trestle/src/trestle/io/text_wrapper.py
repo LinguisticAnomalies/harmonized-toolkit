@@ -22,7 +22,14 @@ class ChaTextWrapper(BatchWrapperBase):
     """
     Wrapper for processing a SINGLE TalkBank corpus
     """
-    def __init__(self, corpus, text_root, out_root, audio_root, task_boundaries):
+    def __init__(
+            self,
+            corpus: str,
+            text_root: Path,
+            out_root: Path,
+            audio_root: Path,
+            task_boundaries: list[TaskBoundary] | None=None,
+            dry_run: bool=False):
         super().__init__(
             corpus=corpus,
             root=text_root,
@@ -31,6 +38,13 @@ class ChaTextWrapper(BatchWrapperBase):
         )
         self.audio_root = Path(audio_root)
         self.task_boundaries = task_boundaries
+        self.dry_run = dry_run
+
+        # if no task boundaries
+        if not self.task_boundaries:
+            self.task_boundaries = [
+                TaskBoundary(name="full", content_mark=None)
+            ]
     
     def _iter_files(self):
         return self.root.rglob("*.cha")
@@ -74,12 +88,16 @@ class ChaTextWrapper(BatchWrapperBase):
             )
 
             for task in self.task_boundaries:
-                name_parts = []
+                name_parts = [task.name]
                 if batch.suffix:
                     name_parts.append(batch.suffix)
-                name_parts.append(task.name)
 
                 out_file = "_".join(name_parts)
+
+                if self.dry_run:
+                    print(out_dir / f"{out_file}_utterance.{format}")
+                    print(out_dir / f"{out_file}_participant.{format}")
+                    continue
 
                 content_mark = (
                     task.content_mark()

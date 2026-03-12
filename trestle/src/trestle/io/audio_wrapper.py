@@ -75,4 +75,3 @@ class AudioWrapper(BatchWrapperBase):
                     self.target_sr,
                     format=self.target_format,
                 )
-                

@@ -1,3 +1,3 @@
-from .audio_processor import AudioConvert
+from .audio_processor import AudioClipper
 
-__all__ = ['AudioConvert']
+__all__ = ['AudioClipper']
