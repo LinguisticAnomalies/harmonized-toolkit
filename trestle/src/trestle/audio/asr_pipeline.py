@@ -8,7 +8,6 @@ from transformers import (
     AutoProcessor,
     AutoModelForSpeechSeq2Seq,
     AutoModelForCTC,
-    AutoFeatureExtractor
 )
 from trestle.io.batch_wrapper import BatchWrapperBase
 
