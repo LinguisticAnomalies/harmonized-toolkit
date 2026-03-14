@@ -12,7 +12,7 @@ class ChaProcessor:
             self,
             txt_patterns: dict[str, any],
             files: list[str],
-            out_dir: str,
+            out_dir: Path,
             audio_files: list[Path] | None=None):
         """
 

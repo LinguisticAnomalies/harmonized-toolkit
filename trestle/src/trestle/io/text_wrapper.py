@@ -1,6 +1,7 @@
 from pathlib import Path
+import json
 from dataclasses import dataclass
-from typing import Iterable, Callable, Iterator
+from typing import Callable
 from trestle.io.batch_wrapper import BatchWrapperBase
 
 @dataclass
@@ -28,6 +29,7 @@ class ChaTextWrapper(BatchWrapperBase):
             text_root: Path,
             out_root: Path,
             audio_root: Path,
+            meta_root: Path,
             task_boundaries: list[TaskBoundary] | None=None,
             dry_run: bool=False):
         super().__init__(
@@ -37,6 +39,8 @@ class ChaTextWrapper(BatchWrapperBase):
             modality_dir="text",
         )
         self.audio_root = Path(audio_root)
+        self.meta_root = Path(meta_root)
+        self.meta_root.mkdir(parents=True, exist_ok=True)
         self.task_boundaries = task_boundaries
         self.dry_run = dry_run
 
@@ -72,10 +76,22 @@ class ChaTextWrapper(BatchWrapperBase):
             suffix=suffix,
             pairs=pairs,
         )
+    
+    def _write_patterns(self, txt_patterns: dict):
+        path = self.meta_root / f"{self.corpus}_text_patterns.json"
+        rules = [
+            {"pattern": k, "replace": v}
+            for k, v in txt_patterns.items()
+        ]
+
+        with open(path, "w") as f:
+            json.dump(rules, f, ensure_ascii=False)
+
 
     def run(self, cha_processor_cls, txt_patterns, format="parquet"):
         for batch in self.iter_batches():
             out_dir = self.resolve_out_dir(batch)
+            self._write_patterns(txt_patterns)
 
             cha_files = [c for c, _ in batch.pairs]
             audio_files = [a for _, a in batch.pairs]
