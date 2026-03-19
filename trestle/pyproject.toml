@@ -3,6 +3,7 @@ name = "trestle"
 version = "2.2.0"
 description = "Toolkit for Reproducible Speech, Text, and Language Experiments"
 readme = "README.md"
+classifiers = ["Private :: Do Not Upload"]
 requires-python = ">=3.12"
 dependencies = [
   "accelerate>=1.13.0",
@@ -14,7 +15,6 @@ dependencies = [
   "protobuf>=7.34.0",
   "psutil>=7.2.2",
   "pydub>=0.25.1",
-  "requests>=2.32.5",
   "torch==2.8.0",
   "torchaudio==2.8.0",
   "transformers>=5.3.0",
@@ -25,6 +25,11 @@ flash-attn = { url = "https://github.com/Dao-AILab/flash-attention/releases/down
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -1,128 +1,115 @@
 # TRESTLE
 
-This repository contains code developed for TRESTLE (Toolkit for Reproducible Execution of Speech Text and Language Experiments), an open source platform that focuses on text and audio preprocessing for corpora that follow CHAT and Praat's TextGrid protocols. TRESTLE is initially designed to execute preprocessing for two datasets from the TalkBank repository with dementia detection as an illustrative domain. It can be easily adapted to other corpora that support CHAT and TextGrid protocols. The TextGrid functionalities are supported by the [textgrid](https://github.com/kylebgorman/textgrid) package.
-
+This repository contains code developed for TRESTLE (Toolkit for Reproducible Execution of Speech Text and Language Experiments), an open source platform that focuses on text and audio preprocessing for corpora that follow the CHAT protocol.
 
 ## Setup
-Please install dependency packages using `pip install -r requirements.txt` or `conda install --yes --file requirements.txt` with Python version at least 3.8.
 
-Please also make sure you have [FFmpeg](https://ffmpeg.org/) installed.
+TRESTLE is built with python 3.12. The environment can be setup with `uv sync` with the `pyproject.toml` file.
 
-## Usage
+By default, TRESTLE's dependencies include pytorch with cuda 12.6, which the cuda version can be easily updated in `pyproject.toml` file.
 
-### Text Preprocessing
 
-TRESTLE supports user-defined regex patterns for text-prerpcessing. To start, one needs to define regex patterns by initializing a python dictionary:
 
-```python
-# Define regex patterns for text preprocessing
-txt_patterns = {
-        r'\([^)]*\)': "",
-        r'(\w)\1\1': '',
-        r'\[.*?\]': "",
-        r'&-(\w+)': r'\1',
-        r'&+(\w+)': r'\1',
-        r'<(\w+)>': r'\1',
-        r'\+...': "",
-        r'[^A-Za-z\n \']': '',
-        r'\s+': ' ',
-    }
-```
+## TRESTLE Structure
 
-Users also need to define a dictionary containing pointers to the input text/audio and save locations for output. In this dictionary, users also need to specify the format of input text  (i.e., `.cha` or `.TextGrid`), the audio format (i.e., `.mp3` or `.wav`). The `speaker` is the required field for CHAT transcripts to indicate the utterance to be preprocessed. If it has multiple tasks in a CHAT transcript, users can use `content` to specify the subset for further preprocessing.
-
-Please note that the paths should be full path.
-
-```python
-sample = {
-  "format": ".cha",
-  "text_input_path":"/path/to/input/txt",
-  "audio_input_path": "/path/to/audio/recordings",
-  "text_output_path": "/path/to/output/txt",
-  "audio_output_path": "/path/to/output/audio/recording",
-  "audio_type": ".mp3",
-  "speaker": "*PAR",
-  "content": r'@Bg:	Activity\n.*?@Eg:	Activity'
-  }
-```
-
-Users can start preprocessing by:
-
-```python
-from trestle import TextWrapperProcessor
-wrapper_processor = TextWrapperProcessor(
-    data_loc=sample, txt_patterns=txt_patterns)
-wrapper_processor.process()
-```
-
-The utterance-level transcript will be saved to the `text_output_path` as a .jsonline file with the following structure:
-
-```jsonline
-{"start": 0.0, "end": 6875.0, "text": "one does not simply walk in to mordor", "audio": "/path/to/the/recording/file_name.wav"}
-```
-
-#### Note
-TRESTLE assumes that the the file names for the text transcript and audio recording for each participant stay the same. If a .TextGrid corpus that presents special tier naming convention, one can add a special `data_type` key-value pair in the following setup:
-
-```python
-sample = {
-  "format": ".TextGrid",
-  "text_input_path":"/path/to/input/txt",
-  "audio_input_path": "/path/to/audio/recordings",
-  "text_output_path": "/path/to/output/txt",
-  "audio_output_path": "/path/to/output/audio/recording",
-  "audio_type": ".mp3",
-  "data_type": "a_special_mark",
-  }
-```
-Then modify the processing rule in the `clean_textgird` and `process_special_tier` functions in the `TextGridProcessor` class accordingly.
-
-### Audio Preprocessing
-
-To preprocess the audio recordings, users need to run text preprocessing first to get the utterance-level transcripts. The audio preprocessing module is designed to resample the input audio recordings and slice them into utterance-level audio clips. Users can start audio preprocessing by:
-
-```python
-from trestle import AudioProcessor
-processor = AudioProcessor(
-  data_loc=sample, sample_rate=16000)
-processor.process_audio()
-```
-
-The audio output folder with the following structure:
+TRESTLE has 4 modules: a) audio; b) text, c) config; and d)io. The structure of TRESTLE is shown below.
 
 ```
-├── audio_output_path
-│   ├── metadata.csv
-│   ├── file_name_1.wav
-│   ├── file_name_2.wav
-│   ├── file_name_3.wav
+├── main.py
+├── pyproject.toml
+├── README.md
+├── src
+│   ├── trestle
+│   │   ├── audio
+│   │   │   ├── audio_processor.py
+│   │   │   ├── __init__.py
+│   │   ├── configs
+│   │   │   └── config.ini
+│   │   ├── __init__.py
+│   │   ├── io
+│   │   │   ├── audio_wrapper.py
+│   │   │   ├── batch_wrapper.py
+│   │   │   ├── config.py
+│   │   │   ├── feature_extractor.py
+│   │   │   ├── __init__.py
+│   │   │   └── text_wrapper.py
+│   │   └── text
+│   │       ├── cha_processor.py
+│   │       ├── __init__.py
+└── uv.lock
 ```
 
-The metadata.csv files stores the audio clips and corrsponding transcript with the following structure:
+The `config.ini` under the config module should follow the following structures, where `corpus_1` and `system` are placeholder for the TalkBank subsite and corpus.
 
 ```
-file_name,transcription
-file_name_1.wav,one does not simply walk into mordor
+[system]
+corpus_1 = /path/to/system/corpus_1 # path to corpus file with audio and text as separate sub folders
+corpus_2 = /path/to/system/corpus_2
+
+[outputs]
+text = /path/to/output/text
+audio = /path/to/output/audio
+clips = /path/to/output/clips
+asr = /path/to/output/asr
+meta = /path/to/output/meta # preprocessing patterns and ASR decoding configs are saved here as .json files
 ```
 
+### Audio Module
+The audio module supports the following functionalities:
 
-## AAAI 2022 Hackallenge
+- Resample the audio files (by default, in .mp3) into 16kHz .wav files.
+- Segment resampled audio files into utterance-level clips for downstream ASR pipeline. Note that text preprocessing is required for this functionality.
+  - The sementation saves the `metadata.parquet` file under each child folder for matting the source audio file and audio clip file
+- ASR pipeline to generate transcripts on the utterance level, using the data obtained in the audio clipper function
+    - The ASR pipeline currently supports inference with Wav2Vec2, HuBERT, and Whisper. The decoding strategies for whisper is a required argument and will be saved to `output/meta folder`
 
-Read more [here](hackallenge.md).
+The audio clip metdata follows the following structure:
 
-
-## Citation
-
-If you use TRESTLE in your research, please cite our paper via:
-
-```bib
-@article{li2023trestle,
-  title={TRESTLE: Toolkit for Reproducible Execution of Speech, Text and Language Experiments},
-  author={Li, Changye and Xu, Weizhe and Cohen, Trevor and Michalowski, Martin and Pakhomov, Serguei},
-  journal={AMIA Summits on Translational Science Proceedings},
-  volume={2023},
-  pages={360},
-  year={2023},
-  publisher={American Medical Informatics Association}
-}
 ```
+clip_path: the path to the this clip audio, naming conversion follows {task}_{pid}_{n}.wav, where n representing the n-th clip from the task with participant unique identifier of pid
+pid: participant unique identifier
+text: the utterance for this clip
+source_audio: the source audio file
+```
+
+### Text Module
+
+The text module preprocesses .cha files with user defined regex patterns, where the patterns are saved to `output/meta folder`
+  - Users can defind a task boundary for task-wise preprocessing
+  - If the task boundary is not defined, the text module preprocesses **all** utterances in the .cha files
+  - This module generates two output files as per task: `{task}_utterance.{format}` and `{task}_participant.{format}`, where the supported formats are .jsonl, .csv, and .parquet
+  
+The output files follows the following structure:
+
+```
+start: start_in_ms for the utterance
+end: end_in_ms for the utterance
+text: the utterance in the .cha file
+pid: unique identider for participant,
+audio_path: path_to_audio
+```
+  
+### Config Module
+
+This module reads the `config.ini` file stores under this module for reading the input and output paths
+
+### IO module
+
+This module supports intermediate functionalities for preprocessing.
+
+For input and output structure, and TRESTLE usage, please refer to [here](trestle/README.md)
+
+## Misc
+
+For TRESTLE 1.0, please refer to [here](v1).
+
+For a sample analysis code, please refer to [here](analysis)
+
+## Changelogs
+- [x] rework .cha processor
+- [x] rework audio preprocessor
+- [x] rework audio sliding processor
+- [x] add ASR pipeline
+- [x] better downstream feature pipeline API
+- [x] rewrite readme 
+- [ ] add textgrid processor
