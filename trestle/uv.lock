@@ -1027,11 +1027,6 @@ dependencies = [
     { name = "transformers" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -1048,12 +1043,10 @@ requires-dist = [
     { name = "protobuf", specifier = ">=7.34.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pydub", specifier = ">=0.25.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "torch", specifier = "==2.8.0" },
     { name = "torchaudio", specifier = "==2.8.0" },
     { name = "transformers", specifier = ">=5.3.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.2" }]

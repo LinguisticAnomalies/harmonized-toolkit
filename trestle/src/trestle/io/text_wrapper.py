@@ -10,7 +10,7 @@ class TaskBoundary:
     Definition of an utterance boundary for a task
     """
     name: str
-    content_mark: Callable[[str], str] 
+    content_mark: Callable[[], str] | str | None
 
 @dataclass
 class TextBatch:
@@ -31,18 +31,23 @@ class ChaTextWrapper(BatchWrapperBase):
             audio_root: Path,
             meta_root: Path,
             task_boundaries: list[TaskBoundary] | None=None,
+            strict_audio: bool = False,
             dry_run: bool=False):
         super().__init__(
             corpus=corpus,
             root=text_root,
             out_root=out_root,
             modality_dir="text",
+
         )
-        self.audio_root = Path(audio_root)
-        self.meta_root = Path(meta_root)
-        self.meta_root.mkdir(parents=True, exist_ok=True)
-        self.task_boundaries = task_boundaries
+        self.audio_root = Path(audio_root) if audio_root else None
+        self.meta_root = Path(meta_root) if meta_root else None
+        self.task_boundaries = task_boundaries or [
+            TaskBoundary(name="full", content_mark=None)
+        ]
+
         self.dry_run = dry_run
+        self.strict_audio = strict_audio
 
         # if no task boundaries
         if not self.task_boundaries:
@@ -57,6 +62,10 @@ class ChaTextWrapper(BatchWrapperBase):
         pairs = []
 
         for cha in cha_files:
+            # text-only mode
+            if self.audio_root is None:
+                pairs.append((cha, None))
+                continue
             audio_dir = self.audio_root / self.corpus
             if subset:
                 audio_dir /= subset
@@ -66,6 +75,12 @@ class ChaTextWrapper(BatchWrapperBase):
             audio = audio_dir / f"{cha.stem}.wav"
             if audio.exists():
                 pairs.append((cha, audio))
+            else:
+                if self.strict_audio:
+                    print(f"[DROP] Missing audio for {cha} (expected {audio})")
+                else:
+                    print(f"[TEXT-ONLY] Missing audio for {cha}")
+                    pairs.append((cha, None))
 
         if not pairs:
             return None

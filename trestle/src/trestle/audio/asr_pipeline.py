@@ -289,8 +289,13 @@ class Seq2SeqPipeline(BatchWrapperBase):
                         continue
 
                     tokens = self.model.generate(**inputs, **self.gen_config)
+                    if hasattr(tokens, "sequences"):
+                        token_ids = tokens.sequences
+                    else:
+                        token_ids = tokens
+                    token_ids = token_ids.long()
                     texts = self.processor.batch_decode(
-                        tokens,
+                        token_ids,
                         skip_special_tokens=True,
                         normalize=False,
                     )

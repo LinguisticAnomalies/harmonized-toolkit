@@ -22,7 +22,6 @@ class ChaProcessor:
             out_dir: output directory
             audio_files: the corresponding audio files
         """
-        self.txt_patterns = txt_patterns
         self.files = files
         self.out_dir = Path(out_dir)
         self.audio_files = audio_files or []
@@ -31,25 +30,28 @@ class ChaProcessor:
         self.audio_map = {
             p.stem: p for p in self.audio_files
         }
+        self.compiled_patterns = []
+        for pat, rep in txt_patterns.items():
+            try:
+                self.compiled_patterns.append((re.compile(pat), rep))
+            except re.error:
+                pass
     
-    def clean_text(self, text: str, speaker: str='PAR'):
+    def clean_text(self, text: str, speaker_pattern: str='PAR'):
         """
         basic pre-processing for .cha transcripts
         :param text: the transcript for pre-processing
         :type text: str
         """
-        pattern = re.search(r"(\d+_\d+)", text)
         start, end = 0, 0
-        if pattern:
-            start, end = map(int, pattern.group(1).split('_'))
-            text = re.sub(pattern.group(1), '', text)
-        text = re.sub(speaker, '', text)
-        for pattern, replacement in self.txt_patterns.items():
-            try:
-                pattern = re.compile(pattern)
-                text = re.sub(pattern, replacement, text)
-            except re.error:
-                pass
+        m = re.search(r"(\d+_\d+)", text)
+        if m:
+            start, end = map(int, m.group(1).split('_'))
+            text = text.replace(m.group(1), "", 1)
+
+        text = re.sub(speaker_pattern, '', text)
+        for pattern, replacement in self.compiled_patterns:
+            text = pattern.sub(replacement, text)
         return start, end, text.lower().strip()
     
     def clean_cha(
@@ -71,6 +73,7 @@ class ChaProcessor:
         """
         out_path = self.out_dir / Path(out_file)
         out_path = out_path.with_suffix(f".{format}")
+        speaker_pat = re.compile(rf"\*{speaker}:")
 
         all_records = []
 
@@ -85,10 +88,9 @@ class ChaProcessor:
                 text = match.group() if match else ""
                 if not match:
                     print(f"No content_mark match in {cha_file}")
+                    continue
             
             text = re.sub(r"\n\s+", "\n", text)
-
-            speaker_pat = re.compile(rf"\*{speaker}:")
             
             for line in text.splitlines():
                 if not speaker_pat.match(line):
@@ -105,13 +107,18 @@ class ChaProcessor:
                     "pid": file_name,
                     "audio_path": str(audio_path) if audio_path else None,
                 })
+        
+        if not all_records:
+            print("No utterances found.")
+            return
 
         # utterance-level df
-        df_utt = pl.DataFrame(all_records)
+        df_utt = pl.DataFrame(all_records).with_row_index("utt_id")
         # participant-level df
         df_pid = (
             df_utt
-            .group_by("pid")
+            .sort('utt_id')
+            .group_by('pid')
             .agg(
                 pl.col("text").str.join(" ").alias("text"),
                 pl.col("audio_path").drop_nulls().first().alias("audio_path"),
@@ -119,7 +126,7 @@ class ChaProcessor:
         )
 
         # save to local file
-        out_base = self.out_dir / out_file
+        out_base = out_path.with_suffix("")
         if format == 'parquet':
             df_utt.write_parquet(out_base.with_name(f"{out_file}_utterance.parquet"))
             df_pid.write_parquet(out_base.with_name(f"{out_file}_participant.parquet"))

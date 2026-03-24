@@ -2,8 +2,8 @@ import warnings
 from tqdm import tqdm
 from dataclasses import dataclass
 from pathlib import Path
-import torchaudio
-from trestle.io.batch_wrapper import BatchWrapperBase
+from pydub import AudioSegment
+from trestle.io import BatchWrapperBase
 warnings.filterwarnings('ignore')
 
 @dataclass
@@ -34,11 +34,14 @@ class AudioWrapper(BatchWrapperBase):
         self.target_format = target_format
         self.target_sr = target_sr
         self.dry_run = dry_run
+        
 
     def _iter_files(self):
         return self.root.rglob(f"*.{self.source_format}")
 
     def _make_batch(self, subset, suffix, audio_files):
+        if not audio_files:
+            return None
         return AudioBatch(
             corpus=self.corpus,
             subset=subset,
@@ -49,6 +52,7 @@ class AudioWrapper(BatchWrapperBase):
     def run(self):
         for batch in self.iter_batches():
             out_dir = self.resolve_out_dir(batch)
+            out_dir.mkdir(parents=True, exist_ok=True)
 
             for src in tqdm(batch.audio_files, desc="Processing audio"):
                 out_path = out_dir / src.with_suffix(
@@ -59,19 +63,17 @@ class AudioWrapper(BatchWrapperBase):
                     print(f"[DRY] {src} -> {out_path}")
                     continue
 
-                waveform, sr = torchaudio.load(src)
+                audio = AudioSegment.from_file(src)
 
-                if waveform.size(0) > 1:
-                    waveform = waveform.mean(dim=0, keepdim=True)
+                # convert to mono
+                if audio.channels > 1:
+                    audio = audio.set_channels(1)
+                
+                if src.suffix.lower() == ".mp3":
+                    audio = audio.set_sample_width(2)
 
-                if sr != self.target_sr:
-                    waveform = torchaudio.functional.resample(
-                        waveform, sr, self.target_sr
-                    )
+                # resample
+                if audio.frame_rate != self.target_sr:
+                    audio = audio.set_frame_rate(self.target_sr)
 
-                torchaudio.save(
-                    out_path,
-                    waveform,
-                    self.target_sr,
-                    format=self.target_format,
-                )
+                audio.export(out_path, format=self.target_format)

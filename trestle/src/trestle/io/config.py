@@ -1,6 +1,8 @@
 from configparser import ConfigParser
 from pathlib import Path
+from functools import lru_cache
 
+@lru_cache
 def load_config(config_path: str | Path):
     config_path = Path(config_path)
 
